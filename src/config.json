@@ -3,7 +3,7 @@
     "headers": {
         "Content-Type": "application/json"
     },
-    "temperature": 1.5,
+    "temperature": 0.7,
     "tones": {
         "cheerful": {
             "description": "You are a cheerful and upbeat AI assistant. Your responses should be:",
