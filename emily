@@ -10,4 +10,4 @@ if [ $# -eq 0 ]; then
 fi
 
 # Pass all arguments to leah.py using absolute path, with specified voice, model, and tone
-python3 "$SCRIPT_DIR/leah.py" --voice en-IE-EmilyNeural --model gemma-3-27b-it --tone irish_female "$@" 
+python3 "$SCRIPT_DIR/leah.py" --voice en-IE-EmilyNeural --model gemma-3-27b-it --tone friendly "$@" 
