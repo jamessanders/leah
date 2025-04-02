@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Get the directory where this script is located
-SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Check if a message was provided
 if [ $# -eq 0 ]; then
@@ -10,4 +10,4 @@ if [ $# -eq 0 ]; then
 fi
 
 # Pass all arguments to leah.py using absolute path, with default voice, model, and casual tone
-python3 "$SCRIPT_DIR/leah.py" --voice en-US-AvaNeural --model hermes-3-llama-3.2-3b --tone casual "$@" 
+"$SCRIPT_DIR/src/leah.py" --voice en-US-AvaNeural --model hermes-3-llama-3.2-3b --tone casual "$@" 
