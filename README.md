@@ -1,33 +1,43 @@
-# Leah
+# Leah - AI Assistant Framework
 
-A Python script that processes messages and generates text-to-speech responses using Ollama and Edge TTS.
+A flexible framework for creating AI assistants with different personalities and tones.
 
 ## Features
 
-- Process messages using Ollama API
-- Generate text-to-speech responses using Edge TTS
-- Multiple response tones (default, cheerful, serious, casual, friendly)
-- Configurable AI model selection
-- Voice output can be disabled
-- Streaming response output
-- Clean, modular code structure
+- Multiple AI personalities (cheerful, serious, casual, friendly, professional)
+- Text-to-speech voice output
+- Configurable response tones
+- Command-line interface
+- Support for multiple AI models
 
 ## Prerequisites
 
 - Python 3.8 or higher
-- Ollama running locally (default: http://localhost:11434)
-- Edge TTS for voice synthesis
-- Pygame for audio playback
+- [LMStudio](https://lmstudio.ai/) installed and running locally
+- Edge TTS for voice output (optional)
+
+## Installing LMStudio
+
+1. Download LMStudio from [https://lmstudio.ai/](https://lmstudio.ai/)
+2. Install the application on your system
+3. Launch LMStudio
+4. Go to the "Models" tab and download one or more of the following models:
+   - deepseek-r1-distill-qwen-7b
+   - mistral-7b-instruct
+   - llama2-7b-chat
+   - neural-chat-7b-v3-1
+5. Once downloaded, select a model and click "Start Server"
+6. The server will start on `http://localhost:1234`
 
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/jsanders/leah.git
+git clone https://github.com/yourusername/leah.git
 cd leah
 ```
 
-2. Install the required Python packages:
+2. Install Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
@@ -42,9 +52,10 @@ pip install edge-tts
 pip install pygame
 ```
 
-5. Make the script executable:
+5. Make the scripts executable:
 ```bash
 chmod +x src/leah.py
+chmod +x leah frank pam
 ```
 
 ## Usage
@@ -58,8 +69,8 @@ leah "Your message here"
 ### Command Line Options
 
 - `--voice`: Specify the Edge TTS voice to use (default: en-US-AvaNeural)
-- `--model`: Specify the AI model to use (default: gemma-3-27b-it)
-- `--tone`: Choose the response tone (default, cheerful, serious, casual, friendly)
+- `--model`: Specify the AI model to use (default: deepseek-r1-distill-qwen-7b)
+- `--tone`: Choose the response tone (default, cheerful, serious, casual, friendly, professional)
 - `--no-voice`: Disable voice output
 
 ### Examples
@@ -75,7 +86,7 @@ leah --no-voice "Hello, how are you?"
 leah --voice "en-US-JennyNeural" "Hello, how are you?"
 
 # Use a different model
-leah --model "llama2" "Hello, how are you?"
+leah --model "mistral-7b-instruct" "Hello, how are you?"
 
 # Use a different tone
 leah --tone cheerful "Hello, how are you?"
@@ -84,42 +95,18 @@ leah --tone cheerful "Hello, how are you?"
 echo "Hello, how are you?" | leah
 ```
 
-## Configuration
+### Personality Scripts
 
-The script uses a `config.json` file for configuration. You can modify the following settings:
+The framework includes several personality scripts:
 
-- `url`: Ollama API URL
-- `headers`: API request headers
-- `temperature`: Response temperature (0.0 to 1.0)
-- `tones`: Response tone configurations
+- `leah`: Default personality
+- `frank`: Serious and direct personality
+- `pam`: Professional and polished personality
 
-Example `config.json`:
-```json
-{
-    "url": "http://localhost:11434/api/chat",
-    "headers": {
-        "Content-Type": "application/json"
-    },
-    "temperature": 0.7,
-    "tones": {
-        "default": {
-            "description": "You are a helpful and friendly AI assistant.",
-            "traits": [
-                "Professional and courteous",
-                "Clear and concise",
-                "Helpful and informative"
-            ]
-        },
-        "cheerful": {
-            "description": "You are an enthusiastic and upbeat AI assistant.",
-            "traits": [
-                "Energetic and positive",
-                "Friendly and engaging",
-                "Optimistic and encouraging"
-            ]
-        }
-    }
-}
+Each script can be used directly:
+```bash
+frank "What's the weather like?"
+pam "Can you help me with my project?"
 ```
 
 ## Project Structure
@@ -128,11 +115,13 @@ Example `config.json`:
 leah/
 ├── README.md
 ├── requirements.txt
-├── config.json
-└── src/
-    └── leah.py
+├── src/
+│   └── leah.py
+├── leah
+├── frank
+└── pam
 ```
 
 ## Contributing
 
-Feel free to submit issues and enhancement requests! 
+Feel free to submit issues and enhancement requests!
