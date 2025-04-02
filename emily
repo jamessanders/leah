@@ -10,4 +10,4 @@ if [ $# -eq 0 ]; then
 fi
 
 # Call leah.py with the provided arguments
-"$SCRIPT_DIR/src/leah.py" --voice en-IE-EmilyNeural --model gemma-3-27b-it --tone friendly "$@" 
+"$SCRIPT_DIR/src/leah.py" --voice en-US-AvaNeural --model gemma-3-27b-it --tone friendly "$@" 
