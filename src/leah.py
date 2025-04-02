@@ -7,16 +7,22 @@ This script interacts with an Ollama API for message processing and edge-tts for
 
 import argparse
 import asyncio
+import contextlib
 import edge_tts
 import io
 import json
 import os
 import re
-import subprocess
 import sys
 import textwrap
+import tempfile
 import urllib.request
 from typing import Dict, Any
+
+# Suppress pygame output
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+os.environ['SDL_VIDEODRIVER'] = 'dummy'
+import pygame
 
 
 class Config:
@@ -74,7 +80,8 @@ def process_message(message: str, model: str, tone: str, config: Config) -> str:
     
     # Create request object
     url = config.get_ollama_url()
-    headers = config.get_headers()    
+    headers = config.get_headers()
+    
     req = urllib.request.Request(url, data=data, headers=headers, method='POST')
     
     # Send request and get response
@@ -104,21 +111,34 @@ def process_message(message: str, model: str, tone: str, config: Config) -> str:
 
 
 # Audio Generation
-async def speak_text(text: str, voice: str) -> None:
-    """Generate and play audio from text using a temporary file in the current directory."""
-    communicate = edge_tts.Communicate(text, voice)
-    await communicate.save("temp.mp3")
-    subprocess.run(["afplay", "temp.mp3"])
-    os.remove("temp.mp3")
-
-
-async def generate_audio(text: str, voice: str, script_dir: str) -> None:
-    """Generate and play audio from text using a temporary file in the script's directory."""
-    temp_file = os.path.join(script_dir, "temp.mp3")
-    communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(temp_file)
-    subprocess.run(["afplay", temp_file])
-    os.remove(temp_file)
+async def speak_text(text: str, voice: str, script_dir: str) -> None:
+    """Generate and play audio from text using a temporary file."""
+    pygame.mixer.init()
+    
+    try:
+        # Create a temporary file with .mp3 extension
+        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
+            temp_path = temp_file.name
+        
+        # Generate and save the audio to the temporary file
+        communicate = edge_tts.Communicate(text, voice)
+        await communicate.save(temp_path)
+        
+        # Load and play the audio
+        pygame.mixer.music.load(temp_path)
+        pygame.mixer.music.play()
+        
+        # Wait for the audio to finish playing
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+    finally:
+        # Clean up
+        pygame.mixer.quit()
+        # Remove the temporary file
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
 
 
 def main():
@@ -130,6 +150,7 @@ def main():
     parser.add_argument('--tone', default='default', 
                        choices=['default', 'cheerful', 'serious', 'casual', 'friendly'], 
                        help='Response tone')
+    parser.add_argument('--no-voice', action='store_true', help='Disable voice output')
     args = parser.parse_args()
     
     # Get message from arguments or stdin
@@ -151,8 +172,9 @@ def main():
     # Process the message
     response = process_message(message, args.model, args.tone, config)
     
-    # Generate and play audio
-    asyncio.run(generate_audio(response, args.voice, script_dir))
+    # Generate and play audio if voice is enabled
+    if not args.no_voice:
+        asyncio.run(speak_text(response, args.voice, script_dir))
 
 
 if __name__ == "__main__":
