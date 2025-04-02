@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Check if a message was provided
+if [ $# -eq 0 ]; then
+    echo "Usage: frank your message here"
+    exit 1
+fi
+
+# Call leah.py with the provided arguments
+"$SCRIPT_DIR/src/leah.py" --voice en-US-AvaNeural --model gemma-3-27b-it --tone professional "$@" 
