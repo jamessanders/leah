@@ -9,5 +9,5 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
-# Call leah.py with the provided arguments
-"$SCRIPT_DIR/src/leah.py" --voice en-US-AvaNeural --model gemma-3-27b-it --tone professional "$@" 
+# Process the message with the professional persona
+"$SCRIPT_DIR/src/leah.py" --persona professional "$@" 

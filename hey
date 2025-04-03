@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Check if at least two arguments are provided
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <persona> <message>"
+    echo "Example: $0 cheerful Hello, how are you?"
+    exit 1
+fi
+
+# Get the persona from the first argument
+PERSONA="$1"
+shift
+
+# Pass the persona and the remaining arguments as the message to leah.py
+./src/leah.py --persona "$PERSONA" "$@" 
