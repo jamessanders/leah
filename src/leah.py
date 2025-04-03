@@ -339,7 +339,6 @@ def stream_response(response, voice=None, script_dir=None):
     return full_response, voice_thread
 
 
-# Message Processing
 def process_message(message: str, persona: str, config: Config, conversation_history: list = None, voice: str = None, script_dir: str = None) -> str:
     """Process the message and return the response."""
     if conversation_history is None:
@@ -432,8 +431,10 @@ def main():
     # Get message from arguments or stdin
     if args.message:
         message = ' '.join(args.message)
-    else:
-        message = sys.stdin.read().strip()
+ 
+    if not sys.stdin.isatty():
+        message = sys.stdin.read().strip() + "\n" + message
+        sys.stdin = open("/dev/tty")
     
     if not message:
         print("Error: No message provided")
