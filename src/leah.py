@@ -63,15 +63,20 @@ def filter_think_tags(text: str) -> str:
 
 
 # Message Processing
-def process_message(message: str, model: str, tone: str, config: Config) -> str:
+def process_message(message: str, model: str, tone: str, config: Config, conversation_history: list = None, voice: str = None, script_dir: str = None) -> str:
     """Process the message and return the response."""
+    if conversation_history is None:
+        conversation_history = [
+            { "role": "system", "content": config.get_system_content(tone) }
+        ]
+    
+    # Add user's message to conversation history
+    conversation_history.append({ "role": "user", "content": message })
+    
     data = {
         "model": model,
         "temperature": config.get_temperature(),
-        "messages": [
-            { "role": "system", "content": config.get_system_content(tone) },
-            { "role": "user", "content": message }
-        ],
+        "messages": conversation_history,
         "stream": True
     }
     
@@ -107,6 +112,25 @@ def process_message(message: str, model: str, tone: str, config: Config) -> str:
             print("I don't know right now")
             full_response = "I don't know right now"
         
+        # Add assistant's response to conversation history
+        conversation_history.append({ "role": "assistant", "content": full_response })
+        
+        # Speak the text if voice and script_dir are provided
+        if voice and script_dir:
+            asyncio.run(speak_text(full_response, voice, script_dir))
+        
+        # Get additional input without going to a new line
+        print(">> ", end='', flush=True)
+        additional_input = input().strip()
+        
+        if additional_input:
+            # Join message and full_response by new line and prepend to additional_input
+            additional_input = f"{message}\n{full_response}\n{additional_input}"
+            
+            # Recursively process the additional input with the updated conversation history
+            return process_message(additional_input, model, tone, config, conversation_history, voice, script_dir)
+        
+        # Return the filtered response without speaking it again
         return filter_think_tags(full_response)
 
 
@@ -170,11 +194,10 @@ def main():
     config = Config()
     
     # Process the message
-    response = process_message(message, args.model, args.tone, config)
+    response = process_message(message, args.model, args.tone, config, voice=args.voice, script_dir=script_dir)
     
-    # Generate and play audio if voice is enabled
-    if not args.no_voice:
-        asyncio.run(speak_text(response, args.voice, script_dir))
+    # Print the response
+    print(response)
 
 
 if __name__ == "__main__":
