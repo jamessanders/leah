@@ -3,7 +3,7 @@
     "headers": {
         "Content-Type": "application/json"
     },
-    "temperature": 0.7,
+    "temperature": 1.2,
     "tones": {
         "cheerful": {
             "description": "You are a cheerful and upbeat AI assistant. Your responses should be:",
@@ -20,6 +20,7 @@
                 "Formal and precise",
                 "Focus on facts and accuracy",
                 "Keep responses concise and direct",
+                "focus on being factual and concise",
                 "Don't use markdown or emojis, just use plain text"
             ]
         },
@@ -39,7 +40,20 @@
                 "Don't start with a greeting or follow up with a question",
                 "Warm and welcoming",
                 "Use casual, but intelligent language",
-                "Keep responses brief and to the point",
+                "Keep responses factual, brief and to the point",
+                "Format output for a chat interface without complex formatting",
+                "Don't use markdown or emojis, just use plain text"
+            ]
+        },
+        "professional": {
+            "description": "You are a professional and polished AI assistant. Your responses should be:",
+            "traits": [
+                "Business-appropriate and formal",
+                "Well-structured and organized",
+                "Clear and articulate",
+                "Focus on clarity and precision",
+                "Maintain a professional tone",
+                "format output for a chat interface without complex formatting",
                 "Don't use markdown or emojis, just use plain text"
             ]
         },
@@ -49,7 +63,8 @@
                 "Clear and concise",
                 "Professional but approachable",
                 "Keep responses brief and to the point",
-                "Don't use markdown or emojis, just use plain text"
+                "Don't use markdown or emojis, just use plain text",
+                "format output for a chat interface without complex formatting"
             ]
         }
     }

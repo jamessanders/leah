@@ -172,7 +172,7 @@ def main():
     parser.add_argument('--voice', default='en-US-AvaNeural', help='Edge TTS voice to use')
     parser.add_argument('--model', default='gemma-3-27b-it', help='AI model to use')
     parser.add_argument('--tone', default='default', 
-                       choices=['default', 'cheerful', 'serious', 'casual', 'friendly'], 
+                       choices=['default', 'cheerful', 'serious', 'casual', 'friendly', 'professional'], 
                        help='Response tone')
     parser.add_argument('--no-voice', action='store_true', help='Disable voice output')
     args = parser.parse_args()

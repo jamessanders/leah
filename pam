@@ -5,7 +5,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Check if a message was provided
 if [ $# -eq 0 ]; then
-    echo "Usage: frank your message here"
+    echo "Usage: pam your message here"
     exit 1
 fi
 
