@@ -234,6 +234,9 @@ class VoiceThread:
 async def generate_audio_file(text, voice):
     """Generate an audio file from text and return the path to the file."""
     try:
+        # Strip asterisks from text
+        text = text.replace('*', '')
+        
         # Create a temporary file with .mp3 extension
         with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
             temp_path = temp_file.name
@@ -358,7 +361,6 @@ def process_message(message: str, persona: str, config: Config, conversation_his
     
     # Convert data to JSON string and encode it
     data = json.dumps(data).encode('utf-8')
-    
     # Create request object
     url = config.get_ollama_url()
     headers = config.get_headers()
@@ -386,9 +388,6 @@ def process_message(message: str, persona: str, config: Config, conversation_his
                 # Shutdown the voice thread if it exists
                 if voice_thread is not None:
                     voice_thread.shutdown()
-                
-                # Join message and full_response by new line and prepend to additional_input
-                additional_input = f"{message}\n{full_response}\n{additional_input}"
                 
                 # Recursively process the additional input with the updated conversation history
                 return process_message(additional_input, persona, config, conversation_history, voice, script_dir)
@@ -445,10 +444,7 @@ def main():
     
     try:
         # Process the message
-        response = process_message(message, args.persona, config, voice=args.voice, script_dir=script_dir)
-        
-        # Print the response
-        print(response)
+        process_message(message, args.persona, config, voice=args.voice, script_dir=script_dir)
     except KeyboardInterrupt:
         print("\n\nInterrupted by user. Exiting gracefully...")
         # Ensure pygame is properly cleaned up
