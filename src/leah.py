@@ -23,7 +23,7 @@ from typing import Dict, Any
 from copy import deepcopy
 import time
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 from datetime import datetime
 
 # Suppress pygame output
@@ -372,7 +372,6 @@ def get_initial_data_and_response(message: str, config: Config) -> str:
         ],
         "stream": False
     }
-    
     # Call the LLM API with the initial data
     initial_response = call_llm_api(initial_data, config.get_ollama_url(), config.get_headers())
     
@@ -412,6 +411,17 @@ Answer the query based on the context and cite your source.
 
 
 def process_message(message: str, persona: str, config: Config, conversation_history: list = None, voice: str = None, script_dir: str = None) -> str:
+   # Check if the persona has 'get_pre_context' in main
+    persona_config = config._get_persona_config(persona)
+    if persona_config.get('get_pre_context', False):
+        # Prepare initial call to LLM API and rewrite the message
+        if (conversation_history is None):
+           message = get_initial_data_and_response(message, config)
+        else:
+           message = get_initial_data_and_response(conversation_history[-2]['content'] + "\n\nThe query is: " + message, config)
+           conversation_history[-1]['content'] = "redacted"
+    print(message)
+
     """Process the message and return the response."""
     if conversation_history is None:
         conversation_history = [
@@ -496,7 +506,18 @@ def download_and_extract_content(url: str) -> tuple:
             # Limit the number of tokens to 1024
             tokens = text_content.split()
             limited_content = ' '.join(tokens[:3024])
-            return limited_content, status_code
+            
+            # Extract all links with text from the main content and ensure they are fully qualified
+            links = [f"<a href='{urljoin(url, a['href'])}'>{a.get_text(strip=True)}</a>" for a in main_content.find_all('a', href=True) if a.get_text(strip=True)] if main_content else []
+            
+            # Limit the number of links to 32
+            links = links[:32]
+            
+            # Append the list of links to the content
+            links_content = '\n'.join(links)
+            
+            # Return the content with the appended links
+            return f"{limited_content}\n\nLinks (limited to 32):\n{links_content}", status_code
         else:
             return "No main content found.", status_code
     except Exception as e:
@@ -532,12 +553,6 @@ def main():
     
     # Get the script's directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # Check if the persona has 'get_pre_context' in main
-    persona_config = config._get_persona_config(args.persona)
-    if persona_config.get('get_pre_context', False):
-        # Prepare initial call to LLM API and rewrite the message
-        message = get_initial_data_and_response(message, config)
         
     try:
         # Process the message
