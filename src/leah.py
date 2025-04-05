@@ -364,10 +364,10 @@ def get_initial_data_and_response(message: str, config: Config) -> str:
 
     # Prepare initial data
     initial_data = {
-        "model": "hermes-3-llama-3.2-3b",
+        "model": "gemma-3-27b-it",
         "temperature": config.get_temperature(persona),
         "messages": [
-            {"role": "system", "content": "Only respond with a single Wikipedia url and nothing else, only respond with plain text do not use markdown or html"},
+            {"role": "system", "content": "Only respond with a single url and nothing else, prefer short urls, don't use youtube urls, do not use markdown or html"},
             {"role": "user", "content": message}
         ],
         "stream": False
@@ -389,10 +389,14 @@ def get_initial_data_and_response(message: str, config: Config) -> str:
             parsed_url = urlparse(parsed_message)
             if parsed_url.scheme and parsed_url.netloc:
                 extracted_url = parsed_url.geturl()
-                print(f"Grabbing context from: {extracted_url} \n\n")
-                context = download_and_extract_content(extracted_url)
+                print(f"Grabbing context from: {extracted_url}",)
+                context, status_code = download_and_extract_content(extracted_url)
+                if status_code != 200:
+                    print(f"Error: {status_code}, lets try again")
+                    return get_initial_data_and_response(message=message, config=config)
                 now = datetime.now()
                 today = now.strftime("%B %d, %Y")
+                print("\n\n")
                 return f"""
 Here is some context for the query:
 {context}
@@ -469,12 +473,13 @@ def process_message(message: str, persona: str, config: Config, conversation_his
         return f"I encountered an error: {str(e)}"
 
 
-def download_and_extract_content(url: str) -> str:
-    """Download an HTML page from a URL and extract the main content, limited to 4048 tokens."""
+def download_and_extract_content(url: str) -> tuple:
+    """Download an HTML page from a URL and extract the main content, limited to 4048 tokens, and return the HTTP status code."""
     try:
         # Send a request to the URL
         with urllib.request.urlopen(url) as response:
             html = response.read()
+            status_code = response.getcode()
             
         # Parse the HTML content
         soup = BeautifulSoup(html, 'html.parser')
@@ -491,11 +496,11 @@ def download_and_extract_content(url: str) -> str:
             # Limit the number of tokens to 1024
             tokens = text_content.split()
             limited_content = ' '.join(tokens[:3024])
-            return limited_content
+            return limited_content, status_code
         else:
-            return "No main content found."
+            return "No main content found.", status_code
     except Exception as e:
-        return f"Error downloading or parsing content: {e}"
+        return f"Error downloading or parsing content: {e}", None
 
 
 def main():
@@ -528,14 +533,13 @@ def main():
     # Get the script's directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    
-    try:
-        # Check if the persona has 'get_pre_context' in main
-        persona_config = config._get_persona_config(args.persona)
-        if persona_config.get('get_pre_context', False):
-            # Prepare initial call to LLM API and rewrite the message
-            message = get_initial_data_and_response(message, config)
+    # Check if the persona has 'get_pre_context' in main
+    persona_config = config._get_persona_config(args.persona)
+    if persona_config.get('get_pre_context', False):
+        # Prepare initial call to LLM API and rewrite the message
+        message = get_initial_data_and_response(message, config)
         
+    try:
         # Process the message
         process_message(message, args.persona, config, voice=args.voice, script_dir=script_dir)
     except KeyboardInterrupt:
