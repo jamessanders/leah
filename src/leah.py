@@ -22,6 +22,9 @@ import urllib.request
 from typing import Dict, Any
 from copy import deepcopy
 import time
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
+from datetime import datetime
 
 # Suppress pygame output
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
@@ -342,6 +345,68 @@ def stream_response(response, voice=None, script_dir=None):
     return full_response, voice_thread
 
 
+def call_llm_api(data: dict, url: str, headers: dict) -> Any:
+    """Call the LLM API with the given data, URL, and headers, and return the response."""
+    # Convert data to JSON string and encode it
+    data = json.dumps(data).encode('utf-8')
+
+    # Create request object
+    req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+    
+    # Send request and return the response object without reading it
+    return urllib.request.urlopen(req)
+
+
+def get_initial_data_and_response(message: str, config: Config) -> str:
+    """Prepare the initial data, get the response, and rewrite the message."""
+    # Use the default persona from config
+    persona = config.get_persona_choices()[0]
+
+    # Prepare initial data
+    initial_data = {
+        "model": "hermes-3-llama-3.2-3b",
+        "temperature": config.get_temperature(persona),
+        "messages": [
+            {"role": "system", "content": "Only respond with a single Wikipedia url and nothing else, only respond with plain text do not use markdown or html"},
+            {"role": "user", "content": message}
+        ],
+        "stream": False
+    }
+    
+    # Call the LLM API with the initial data
+    initial_response = call_llm_api(initial_data, config.get_ollama_url(), config.get_headers())
+    
+    # Process the initial response using 'with' syntax
+    with initial_response as response:
+        url_response = response.read().decode('utf-8')
+        
+        # Parse the message from the first choice in the response
+        response_data = json.loads(url_response)
+        if response_data.get('choices') and response_data['choices'][0].get('message', {}).get('content'):
+            parsed_message = response_data['choices'][0]['message']['content']
+            
+            # Use a rigorous URL parser
+            parsed_url = urlparse(parsed_message)
+            if parsed_url.scheme and parsed_url.netloc:
+                extracted_url = parsed_url.geturl()
+                print(f"Grabbing context from: {extracted_url} \n\n")
+                context = download_and_extract_content(extracted_url)
+                now = datetime.now()
+                today = now.strftime("%B %d, %Y")
+                return f"""
+Here is some context for the query:
+{context}
+
+Source: {extracted_url} (Last updated {today})
+
+Here is the query:
+{message}
+
+Answer the query based on the context and cite your source.
+"""
+        return message
+
+
 def process_message(message: str, persona: str, config: Config, conversation_history: list = None, voice: str = None, script_dir: str = None) -> str:
     """Process the message and return the response."""
     if conversation_history is None:
@@ -358,24 +423,16 @@ def process_message(message: str, persona: str, config: Config, conversation_his
         "messages": conversation_history,
         "stream": True
     }
-    
-    # Convert data to JSON string and encode it
-    data = json.dumps(data).encode('utf-8')
-    # Create request object
-    url = config.get_ollama_url()
-    headers = config.get_headers()
-    
-    req = urllib.request.Request(url, data=data, headers=headers, method='POST')
-    
+    response = call_llm_api(data, config.get_ollama_url(), config.get_headers())
     try:
-        # Send request and get response
-        with urllib.request.urlopen(req) as response:
+        # Use the response with 'with' syntax
+        with response as resp:
             # Use the persona's voice if no voice is specified
             if voice is None:
                 voice = config.get_voice(persona)
             
             # Stream the response and process it sentence by sentence
-            full_response, voice_thread = stream_response(response, voice, script_dir)
+            full_response, voice_thread = stream_response(resp, voice, script_dir)
             
             # Add assistant's response to conversation history
             conversation_history.append({ "role": "assistant", "content": full_response })
@@ -412,6 +469,35 @@ def process_message(message: str, persona: str, config: Config, conversation_his
         return f"I encountered an error: {str(e)}"
 
 
+def download_and_extract_content(url: str) -> str:
+    """Download an HTML page from a URL and extract the main content, limited to 4048 tokens."""
+    try:
+        # Send a request to the URL
+        with urllib.request.urlopen(url) as response:
+            html = response.read()
+            
+        # Parse the HTML content
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # Extract the main content (e.g., from <main> or <body> tags)
+        main_content = soup.find('main') or soup.find('body')
+        
+        # Get text content
+        if main_content:
+            text_content = main_content.get_text(separator=' ', strip=True)
+            # Remove content within square brackets
+            text_content = re.sub(r'\[.*?\]', '', text_content)
+            
+            # Limit the number of tokens to 1024
+            tokens = text_content.split()
+            limited_content = ' '.join(tokens[:3024])
+            return limited_content
+        else:
+            return "No main content found."
+    except Exception as e:
+        return f"Error downloading or parsing content: {e}"
+
+
 def main():
     """Main entry point for the script."""
     # Initialize configuration first to get persona choices
@@ -442,7 +528,14 @@ def main():
     # Get the script's directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
+    
     try:
+        # Check if the persona has 'get_pre_context' in main
+        persona_config = config._get_persona_config(args.persona)
+        if persona_config.get('get_pre_context', False):
+            # Prepare initial call to LLM API and rewrite the message
+            message = get_initial_data_and_response(message, config)
+        
         # Process the message
         process_message(message, args.persona, config, voice=args.voice, script_dir=script_dir)
     except KeyboardInterrupt:

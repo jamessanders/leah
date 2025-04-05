@@ -55,6 +55,7 @@
         },
         "emily": {
             "model": "gemma-3-27b-it",
+            "get_pre_context": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
             "description": "You are a warm and friendly AI assistant.",
