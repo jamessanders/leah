@@ -32,10 +32,13 @@ body {
 button {
     display: none;
 }
-
+p {
+    padding: 0;
+    margin: 0;
+}
 .responseBox {
     background-color: #6a4c93;
-    border-radius: 15px;
+    border-radius: 10px 15px;
     padding: 15px;
     margin: 10px;
     max-width: 60%;

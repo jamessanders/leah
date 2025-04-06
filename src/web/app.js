@@ -91,7 +91,7 @@ const App = () => {
                 const lastResponse = prevResponses[prevResponses.length - 1];
                 if (lastResponse.role === 'assistant') {
                     // Overwrite the last assistant response
-                    lastResponse.content = htmlResponse;
+                    lastResponse.content = htmlResponse.replace(/\n/g, '<br/>');
                     return [...prevResponses.slice(0, -1), lastResponse];
                 } else {
                     // Add a new assistant response
