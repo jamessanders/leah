@@ -357,7 +357,7 @@ def call_llm_api(data: dict, url: str, headers: dict) -> Any:
     return urllib.request.urlopen(req)
 
 
-def get_initial_data_and_response(message: str, config: Config) -> str:
+def get_initial_data_and_response(message: str, config: Config) -> tuple:
     """Prepare the initial data, get the response, and rewrite the message."""
     # Use the default persona from config
     persona = config.get_persona_choices()[0]
@@ -367,7 +367,7 @@ def get_initial_data_and_response(message: str, config: Config) -> str:
         "model": "gemma-3-27b-it",
         "temperature": config.get_temperature(persona),
         "messages": [
-            {"role": "system", "content": "Only respond with a single url and nothing else, prefer short urls, don't use youtube urls, do not use markdown or html"},
+            {"role": "system", "content": "Only respond with a single url and nothing else, prefer short urls, don't use youtube urls, do not use markdown or html, if the user mentions a url just return that url"},
             {"role": "user", "content": message}
         ],
         "stream": False
@@ -389,14 +389,18 @@ def get_initial_data_and_response(message: str, config: Config) -> str:
             if parsed_url.scheme and parsed_url.netloc:
                 extracted_url = parsed_url.geturl()
                 print(f"Grabbing context from: {extracted_url}",)
-                context, status_code = download_and_extract_content(extracted_url)
-                if status_code != 200:
-                    print(f"Error: {status_code}, lets try again")
-                    return get_initial_data_and_response(message=message, config=config)
-                now = datetime.now()
-                today = now.strftime("%B %d, %Y")
+                limited_content, links, status_code = download_and_extract_content(extracted_url)
+                if (status_code != 200):
+                    return get_initial_data_and_response(message, config)
+                links_content = '\n'.join(links)
                 print("\n\n")
-                return f"""
+                return limited_content, links_content, extracted_url
+        return message, '', ''
+
+def context_template(message: str, context: str, extracted_url: str) -> str:
+    now = datetime.now()
+    today = now.strftime("%B %d, %Y")
+    return f"""
 Here is some context for the query:
 {context}
 
@@ -407,20 +411,24 @@ Here is the query:
 
 Answer the query based on the context and cite your source.
 """
-        return message
 
-
-def process_message(message: str, persona: str, config: Config, conversation_history: list = None, voice: str = None, script_dir: str = None) -> str:
+def process_message(message: str, persona: str, config: Config, conversation_history: list = None, voice: str = None, script_dir: str = None, last_context: str = None) -> str:
    # Check if the persona has 'get_pre_context' in main
+    original_message = message
+    links_content = ''
     persona_config = config._get_persona_config(persona)
     if persona_config.get('get_pre_context', False):
         # Prepare initial call to LLM API and rewrite the message
         if (conversation_history is None):
-           message = get_initial_data_and_response(message, config)
+           limited_content, links_content, extracted_url = get_initial_data_and_response(message, config)
+           original_message = message
+           message = context_template(message, limited_content, extracted_url)
         else:
-           message = get_initial_data_and_response(conversation_history[-2]['content'] + "\n\nThe query is: " + message, config)
-           conversation_history[-1]['content'] = "redacted"
-    print(message)
+           if message.startswith('!') and not last_context is None:
+               message = message[1:]
+               limited_content, links_content, extracted_url = get_initial_data_and_response(context_template(message, last_context, ''), config)
+               original_message = message
+               message = context_template(message, limited_content, extracted_url)  
 
     """Process the message and return the response."""
     if conversation_history is None:
@@ -448,8 +456,6 @@ def process_message(message: str, persona: str, config: Config, conversation_his
             # Stream the response and process it sentence by sentence
             full_response, voice_thread = stream_response(resp, voice, script_dir)
             
-            # Add assistant's response to conversation history
-            conversation_history.append({ "role": "assistant", "content": full_response })
             
             # Get additional input without going to a new line
             print(">> ", end='', flush=True)
@@ -459,9 +465,16 @@ def process_message(message: str, persona: str, config: Config, conversation_his
                 # Shutdown the voice thread if it exists
                 if voice_thread is not None:
                     voice_thread.shutdown()
-                
+                 
+                if additional_input.startswith('!'):
+                    conversation_history.pop()
+                    conversation_history.append({ "role": "user", "content": original_message })
+
+                # Add assistant's response to conversation history
+                conversation_history.append({ "role": "assistant", "content": full_response })
+
                 # Recursively process the additional input with the updated conversation history
-                return process_message(additional_input, persona, config, conversation_history, voice, script_dir)
+                return process_message(additional_input, persona, config, conversation_history, voice, script_dir, links_content)
             
             # Return the filtered response without speaking it again
             return filter_think_tags(full_response)
@@ -483,6 +496,35 @@ def process_message(message: str, persona: str, config: Config, conversation_his
         return f"I encountered an error: {str(e)}"
 
 
+def extract_main_content_and_links(html: bytes, base_url: str) -> tuple:
+    """Extract the main content and links from HTML content."""
+    # Parse the HTML content
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    # Extract the main content (e.g., from <main> or <body> tags)
+    main_content = soup.find('main') or soup.find('body')
+    
+    # Get text content
+    if main_content:
+        text_content = main_content.get_text(separator=' ', strip=True)
+        # Remove content within square brackets
+        text_content = re.sub(r'\[.*?\]', '', text_content)
+        
+        # Limit the number of tokens to 1024
+        tokens = text_content.split()
+        limited_content = ' '.join(tokens[:3024])
+        
+        # Extract all links with text from the main content and ensure they are fully qualified
+        links = [f"<a href='{urljoin(base_url, a['href'])}'>{a.get_text(strip=True)}</a>" for a in main_content.find_all('a', href=True) if a.get_text(strip=True)]
+        
+        # Limit the number of links to 32
+        links = links[:256]
+        
+        return limited_content, links
+    else:
+        return "No main content found.", []
+
+
 def download_and_extract_content(url: str) -> tuple:
     """Download an HTML page from a URL and extract the main content, limited to 4048 tokens, and return the HTTP status code."""
     try:
@@ -491,37 +533,16 @@ def download_and_extract_content(url: str) -> tuple:
             html = response.read()
             status_code = response.getcode()
             
-        # Parse the HTML content
-        soup = BeautifulSoup(html, 'html.parser')
+        if status_code != 200:
+            return None, None, status_code
         
-        # Extract the main content (e.g., from <main> or <body> tags)
-        main_content = soup.find('main') or soup.find('body')
+        # Extract main content and links
+        limited_content, links = extract_main_content_and_links(html, url)
         
-        # Get text content
-        if main_content:
-            text_content = main_content.get_text(separator=' ', strip=True)
-            # Remove content within square brackets
-            text_content = re.sub(r'\[.*?\]', '', text_content)
-            
-            # Limit the number of tokens to 1024
-            tokens = text_content.split()
-            limited_content = ' '.join(tokens[:3024])
-            
-            # Extract all links with text from the main content and ensure they are fully qualified
-            links = [f"<a href='{urljoin(url, a['href'])}'>{a.get_text(strip=True)}</a>" for a in main_content.find_all('a', href=True) if a.get_text(strip=True)] if main_content else []
-            
-            # Limit the number of links to 32
-            links = links[:32]
-            
-            # Append the list of links to the content
-            links_content = '\n'.join(links)
-            
-            # Return the content with the appended links
-            return f"{limited_content}\n\nLinks (limited to 32):\n{links_content}", status_code
-        else:
-            return "No main content found.", status_code
+        # Return the limited content and links separately in a tuple
+        return limited_content, links, status_code
     except Exception as e:
-        return f"Error downloading or parsing content: {e}", None
+        return f"Error downloading or parsing content: {e}", None, 404
 
 
 def main():
