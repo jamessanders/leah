@@ -39,6 +39,8 @@ const App = () => {
             const reader = res.body.getReader();
             const decoder = new TextDecoder('utf-8');
 
+            let assistantResponse = '';
+
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
@@ -56,6 +58,7 @@ const App = () => {
                         if (jsonResponse.content) {
                             // Append content as plain text
                             const plainTextContent = jsonResponse.content;
+                            assistantResponse += plainTextContent;
                             setResponses(prevResponses => {
                                 const lastResponse = prevResponses[prevResponses.length - 1];
                                 if (lastResponse.role === 'assistant') {
@@ -76,6 +79,25 @@ const App = () => {
                     }
                 }
             }
+
+            // Store the complete assistant response in conversation history
+            setConversationHistory(prevHistory => [...prevHistory, { role: 'assistant', content: assistantResponse }]);
+
+            // Convert the complete response from markdown to HTML
+            const htmlResponse = marked.parse(assistantResponse);
+
+            // Overwrite the UI with the converted HTML content
+            setResponses(prevResponses => {
+                const lastResponse = prevResponses[prevResponses.length - 1];
+                if (lastResponse.role === 'assistant') {
+                    // Overwrite the last assistant response
+                    lastResponse.content = htmlResponse;
+                    return [...prevResponses.slice(0, -1), lastResponse];
+                } else {
+                    // Add a new assistant response
+                    return [...prevResponses, { role: 'assistant', content: htmlResponse }];
+                }
+            });
         } catch (error) {
             console.error('Error:', error);
         } finally {

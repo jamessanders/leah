@@ -63,6 +63,14 @@ Here is the query:
 Answer the query based on the context.
 """
 
+def generate_voice_file(plain_text_content, voice, voice_dir, timestamp):
+    voice_file_path = os.path.join(voice_dir, f'response_{timestamp}.mp3')
+    async def generate_voice():
+        communicate = edge_tts.Communicate(text=plain_text_content, voice=voice)
+        await communicate.save(voice_file_path)
+    asyncio.run(generate_voice())
+    return f'response_{timestamp}.mp3'
+
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
@@ -122,25 +130,17 @@ def query():
                         content = chunk['choices'][0]['delta']['content']
                         buffered_content += content
                         # Check if the buffered content ends with a sentence-ending punctuation
-                        if buffered_content.endswith(('.', '!', '?')):
+                        if buffered_content.endswith(('.', '!', '?')) and len(buffered_content) > 256:
                             # Generate voice for the complete sentence
                             plain_text_content = strip_markdown(buffered_content)
                             voice = config.get_voice(persona)
                             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
                             voice_dir = os.path.join(WEB_DIR, 'voice')
                             os.makedirs(voice_dir, exist_ok=True)
-                            voice_file_path = os.path.join(voice_dir, f'response_{timestamp}.mp3')
-                            
-                            async def generate_voice():
-                                communicate = edge_tts.Communicate(text=plain_text_content, voice=voice)
-                                await communicate.save(voice_file_path)
-                            
-                            asyncio.run(generate_voice())
-                            
-                            # Create JSON object for the voice file
+                            voice_filename = generate_voice_file(plain_text_content, voice, voice_dir, timestamp)
                             voice_file_info = {
                                 "voice_type": voice,
-                                "filename": f'response_{timestamp}.mp3'
+                                "filename": voice_filename
                             }
                             yield f"data: {json.dumps(voice_file_info)}\n\n"
                             
@@ -149,6 +149,20 @@ def query():
                         yield f"data: {json.dumps({'content': content})}\n\n"
                 except json.JSONDecodeError as e:
                     print(f"Error decoding JSON: {e}")
+
+        # After the loop, check for any remaining buffered content
+        if buffered_content:
+            plain_text_content = strip_markdown(buffered_content)
+            voice = config.get_voice(persona)
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            voice_dir = os.path.join(WEB_DIR, 'voice')
+            os.makedirs(voice_dir, exist_ok=True)
+            voice_filename = generate_voice_file(plain_text_content, voice, voice_dir, timestamp)
+            voice_file_info = {
+                "voice_type": voice,
+                "filename": voice_filename
+            }
+            yield f"data: {json.dumps(voice_file_info)}\n\n"
 
     return app.response_class(generate_stream(), mimetype='text/event-stream')
 
