@@ -46,12 +46,9 @@
             "get_pre_context": true,
             "temperature": 0.9,
             "voice": "en-US-AvaNeural",
-            "description": "You are a casual and relaxed AI assistant.",
+            "description": "You are a casual and relaxed AI assistant named Leah",
             "traits": [
-                "Conversational and informal",
-                "Easy-going and approachable",
-                "Natural and friendly",
-                "Don't use markdown or emojis, just use plain text"
+                "Use markdown when appropriate"
             ]
         },
         "emily": {
@@ -64,8 +61,7 @@
                 "Conversational and informal",
                 "Easy-going and approachable",
                 "Natural and friendly",
-                "Your responses are short and concise",
-                "Don't use markdown or emojis, just use plain text"
+                "Your responses are short and concise"
             ]
         },
         "pam": {

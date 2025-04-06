@@ -1,0 +1,75 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: #2b2d42;
+    color: #f0f0f0;
+}
+
+#root {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.queryInput {
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    border: 1px solid #555;
+    outline: none;
+    font-size: 16px;
+    background-color: #8d99ae;
+    color: #edf2f4;
+}
+
+button {
+    display: none;
+}
+
+.responseBox {
+    background-color: #6a4c93;
+    border-radius: 15px;
+    padding: 15px;
+    margin: 10px;
+    max-width: 60%;
+    word-wrap: break-word;
+    align-self: flex-start;
+    color: #edf2f4;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.userInputBox {
+    background-color: #4a4e69;
+    border-radius: 15px;
+    padding: 15px;
+    margin: 10px;
+    max-width: 60%;
+    word-wrap: break-word;
+    align-self: flex-start;
+    color: #edf2f4;
+}
+
+.responseArea {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background-color: #2b2d42;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 60px); /* Adjust based on your layout */
+}
+
+.loadingMessage {
+    font-style: italic;
+    color: #8d99ae;
+    margin: 10px;
+} 

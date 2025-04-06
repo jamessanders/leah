@@ -21,6 +21,7 @@ from urllib.parse import urlparse, urljoin
 from datetime import datetime
 from voice_thread import VoiceThread
 from config import Config
+from content_extractor import download_and_extract_content
 
 
 # Suppress pygame output
@@ -145,18 +146,6 @@ def stream_response(response, voice=None, script_dir=None):
     # Don't wait for voice tasks to complete, just return the response
     # The voice thread will continue running in the background
     return full_response, voice_thread
-
-
-def call_llm_api(data: dict, url: str, headers: dict) -> Any:
-    """Call the LLM API with the given data, URL, and headers, and return the response."""
-    # Convert data to JSON string and encode it
-    data = json.dumps(data).encode('utf-8')
-
-    # Create request object
-    req = urllib.request.Request(url, data=data, headers=headers, method='POST')
-    
-    # Send request and return the response object without reading it
-    return urllib.request.urlopen(req)
 
 
 def get_initial_data_and_response(message: str, config: Config) -> tuple:
