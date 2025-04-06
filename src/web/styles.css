@@ -75,4 +75,22 @@ p {
     font-style: italic;
     color: #8d99ae;
     margin: 10px;
+}
+.userInputBox .avatar{
+    display: none;
+}
+.avatar {
+    width: 50px;
+    display: flex;
+    justify-content: left;
+    align-items: top;
+}
+
+.avatar img {
+    width: 40px;
+    height: 40px;
+}
+
+.content {
+    flex: 1;
 } 

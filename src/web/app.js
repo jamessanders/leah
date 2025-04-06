@@ -10,6 +10,9 @@ const App = () => {
     const [queue, setQueue] = React.useState([]);
     const [isPlaying, setIsPlaying] = React.useState(false);
 
+    const userAvatarUrl = 'https://via.placeholder.com/40?text=U'; // Placeholder for user avatar
+    const assistantAvatarUrl = '/img/avatar.png'; // Placeholder for assistant avatar
+
     const handleInputChange = (event) => {
         setInputValue(event.target.value);
     };
@@ -91,7 +94,7 @@ const App = () => {
                 const lastResponse = prevResponses[prevResponses.length - 1];
                 if (lastResponse.role === 'assistant') {
                     // Overwrite the last assistant response
-                    lastResponse.content = htmlResponse.replace(/\n/g, '<br/>');
+                    lastResponse.content = htmlResponse;
                     return [...prevResponses.slice(0, -1), lastResponse];
                 } else {
                     // Add a new assistant response
@@ -158,9 +161,20 @@ const App = () => {
                 React.createElement('div', {
                     key: index,
                     className: item.role === 'user' ? 'userInputBox' : 'responseBox',
+                    style: { display: 'flex', alignItems: 'flex-start' } // Align items vertically at the start
+                },
+                React.createElement('div', {
+                    className: 'avatar' // Assign class name 'avatar'
+                },
+                item.role === 'assistant' && React.createElement('img', {
+                    src: assistantAvatarUrl,
+                    alt: 'Assistant Avatar'
+                })),
+                React.createElement('div', {
+                    className: 'content', // Assign class name 'content'
                     dangerouslySetInnerHTML: { __html: item.content }
                 })
-            ),
+            )),
             loading && React.createElement('div', { className: 'loadingMessage' }, 'Loading...')
         ),
         React.createElement('input', {
