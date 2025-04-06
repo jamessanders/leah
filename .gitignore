@@ -23,4 +23,7 @@ wheels/
 
 # Temporary files
 temp.mp3
-.DS_Store 
+.DS_Store
+
+# Voice directory
+voice/ 
