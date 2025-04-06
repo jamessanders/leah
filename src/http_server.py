@@ -106,34 +106,51 @@ def query():
         "model": config.get_model(persona),
         "temperature": config.get_temperature(persona),
         "messages": parsed_history,
-        "stream": False
+        "stream": True
     }
     
     response = call_llm_api(api_data, config.get_ollama_url(), config.get_headers())
-    response_content = response.read().decode('utf-8')
-    response_data = json.loads(response_content)
-    # Extract the content from the response data
-    content = response_data.get('choices', [{}])[0].get('message', {}).get('content', '')
-    # Convert markdown content to plain text
-    plain_text_content = strip_markdown(content)
+    
+    def generate_stream():
+        buffered_content = ""
+        for line in response:
+            line = line.decode('utf-8').strip()
+            if line.startswith('data: '):
+                try:
+                    chunk = json.loads(line[6:])
+                    if chunk.get('choices') and chunk['choices'][0].get('delta', {}).get('content'):
+                        content = chunk['choices'][0]['delta']['content']
+                        buffered_content += content
+                        # Check if the buffered content ends with a sentence-ending punctuation
+                        if buffered_content.endswith(('.', '!', '?')):
+                            # Generate voice for the complete sentence
+                            plain_text_content = strip_markdown(buffered_content)
+                            voice = config.get_voice(persona)
+                            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                            voice_dir = os.path.join(WEB_DIR, 'voice')
+                            os.makedirs(voice_dir, exist_ok=True)
+                            voice_file_path = os.path.join(voice_dir, f'response_{timestamp}.mp3')
+                            
+                            async def generate_voice():
+                                communicate = edge_tts.Communicate(text=plain_text_content, voice=voice)
+                                await communicate.save(voice_file_path)
+                            
+                            asyncio.run(generate_voice())
+                            
+                            # Create JSON object for the voice file
+                            voice_file_info = {
+                                "voice_type": voice,
+                                "filename": f'response_{timestamp}.mp3'
+                            }
+                            yield f"data: {json.dumps(voice_file_info)}\n\n"
+                            
+                            # Reset the buffer
+                            buffered_content = ""
+                        yield f"data: {json.dumps({'content': content})}\n\n"
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding JSON: {e}")
 
-    # Retrieve the voice for the persona
-    voice = config.get_voice(persona)
-
-    # Generate a unique filename using a timestamp
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    voice_dir = os.path.join(WEB_DIR, 'voice')
-    os.makedirs(voice_dir, exist_ok=True)
-    voice_file_path = os.path.join(voice_dir, f'response_{timestamp}.mp3')
-
-    async def generate_voice():
-        communicate = edge_tts.Communicate(text=plain_text_content, voice=voice)
-        await communicate.save(voice_file_path)
-
-    asyncio.run(generate_voice())
-
-    # Return response with audio file URL and conversation history
-    return jsonify(response=content, audio_url=f'/voice/response_{timestamp}.mp3', history=parsed_history)
+    return app.response_class(generate_stream(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
     app.run(port=8001) 
