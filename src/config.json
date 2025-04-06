@@ -43,6 +43,7 @@
         },
         "leah": {
             "model": "hermes-3-llama-3.2-3b",
+            "get_pre_context": true,
             "temperature": 0.9,
             "voice": "en-US-AvaNeural",
             "description": "You are a casual and relaxed AI assistant.",
@@ -58,9 +59,11 @@
             "get_pre_context": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
-            "description": "You are a warm and friendly AI assistant.",
+            "description": "You are a factual and helpful AI assistant.",
             "traits": [
-                "Warm and welcoming",
+                "Conversational and informal",
+                "Easy-going and approachable",
+                "Natural and friendly",
                 "Your responses are short and concise",
                 "Don't use markdown or emojis, just use plain text"
             ]

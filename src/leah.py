@@ -7,122 +7,26 @@ This script interacts with an LMStudio API for message processing and edge-tts f
 
 import argparse
 import asyncio
-import contextlib
 import edge_tts
-import io
 import json
 import os
 import re
 import sys
-import textwrap
 import tempfile
-import threading
-import queue
 import urllib.request
-from typing import Dict, Any
-from copy import deepcopy
+from typing import Any
 import time
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
 from datetime import datetime
+from voice_thread import VoiceThread
+from config import Config
+
 
 # Suppress pygame output
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 os.environ['SDL_VIDEODRIVER'] = 'dummy'
 import pygame
-
-
-class Config:
-    """Configuration management class for the Leah script."""
-    
-    def __init__(self):
-        """Initialize the configuration by loading from config.json."""
-        self.config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
-        self.config = self._load_config()
-    
-    def _load_config(self) -> Dict[str, Any]:
-        """Load configuration from config.json and merge with .hey.config.json if it exists."""
-        # Load the main config file
-        with open(self.config_path, 'r') as f:
-            config = json.load(f)
-        
-        # Check for user config in home directory
-        home_dir = os.path.expanduser("~")
-        user_config_path = os.path.join(home_dir, '.hey.config.json')
-        
-        if os.path.exists(user_config_path):
-            try:
-                with open(user_config_path, 'r') as f:
-                    user_config = json.load(f)
-                
-                # Merge user config with main config
-                config = self._merge_configs(config, user_config)
-            except Exception as e:
-                pass
-        
-        return config
-    
-    def _merge_configs(self, main_config: Dict[str, Any], user_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Merge user config with main config, with user config taking precedence."""
-        # Create a deep copy of the main config to avoid modifying it
-        merged_config = deepcopy(main_config)
-        
-        # Merge top-level keys
-        for key, value in user_config.items():
-            if key not in merged_config:
-                merged_config[key] = value
-            elif isinstance(value, dict) and isinstance(merged_config[key], dict):
-                # Recursively merge dictionaries
-                merged_config[key] = self._merge_configs(merged_config[key], value)
-            else:
-                # User config takes precedence
-                merged_config[key] = value
-        
-        return merged_config
-    
-    def _get_persona_config(self, persona='default') -> Dict[str, Any]:
-        """Get the configuration for a persona, merging with default if needed."""
-        if persona == 'default':
-            return self.config['personas']['default']
-        
-        # Start with a deep copy of the default persona
-        persona_config = deepcopy(self.config['personas']['default'])
-        
-        # Merge in the selected persona's settings
-        if persona in self.config['personas']:
-            for key, value in self.config['personas'][persona].items():
-                persona_config[key] = value
-        
-        return persona_config
-    
-    def get_system_content(self, persona='default') -> str:
-        """Get the system content based on the specified persona."""
-        persona_config = self._get_persona_config(persona)
-        return f"{persona_config['description']}\n" + "\n".join(f"- {trait}" for trait in persona_config['traits'])
-    
-    def get_model(self, persona='default') -> str:
-        """Get the model for the specified persona."""
-        return self._get_persona_config(persona)['model']
-    
-    def get_temperature(self, persona='default') -> float:
-        """Get the temperature setting for the specified persona."""
-        return self._get_persona_config(persona)['temperature']
-    
-    def get_voice(self, persona='default') -> str:
-        """Get the voice for the specified persona."""
-        return self._get_persona_config(persona)['voice']
-    
-    def get_ollama_url(self) -> str:
-        """Get the LMStudio API URL from config."""
-        return self.config['url']
-    
-    def get_headers(self) -> Dict[str, str]:
-        """Get the headers from config."""
-        return self.config['headers']
-    
-    def get_persona_choices(self) -> list:
-        """Get the list of available personas."""
-        return list(self.config['personas'].keys())
 
 
 # Text Processing
@@ -132,108 +36,6 @@ def filter_think_tags(text: str) -> str:
 
 
 # Voice Processing
-class VoiceThread:
-    """Thread for handling voice output without blocking the main thread."""
-    
-    def __init__(self, voice, script_dir):
-        """Initialize the voice thread."""
-        self.voice = voice
-        self.script_dir = script_dir
-        self.queue = queue.Queue()
-        self.running = True
-        self.thread = threading.Thread(target=self._run, daemon=True)
-        self.thread.start()
-    
-    def _run(self):
-        """Run the voice thread, processing items from the queue."""
-        while self.running:
-            try:
-                # Get an item from the queue with a timeout
-                audio_file = self.queue.get(timeout=0.5)
-                if audio_file is None:  # Shutdown signal
-                    break
-                
-                # Play the audio file
-                self._play_audio(audio_file)
-                
-                # Mark the task as done
-                self.queue.task_done()
-            except queue.Empty:
-                # No items in the queue, continue waiting
-                continue
-            except Exception as e:
-                print(f"Error in voice thread: {e}")
-    
-    def _play_audio(self, audio_file):
-        """Play audio from a file."""
-        pygame.mixer.init()
-        
-        try:
-            # Load and play the audio
-            pygame.mixer.music.load(audio_file)
-            pygame.mixer.music.play()
-            
-            # Wait for the audio to finish playing
-            while pygame.mixer.music.get_busy():
-                pygame.time.Clock().tick(10)
-            
-            # Clean up
-            pygame.mixer.quit()
-            # Remove the temporary file
-            try:
-                os.unlink(audio_file)
-            except:
-                pass
-        except Exception as e:
-            print(f"Error playing audio: {e}")
-            # Clean up
-            pygame.mixer.quit()
-            # Remove the temporary file if it exists
-            try:
-                if os.path.exists(audio_file):
-                    os.unlink(audio_file)
-            except:
-                pass
-    
-    def add_audio_file(self, audio_file):
-        """Add an audio file to the queue for processing."""
-        if self.running:
-            self.queue.put(audio_file)
-    
-    def clear_queue(self):
-        """Clear all pending audio files from the queue."""
-        # Create a new empty queue
-        new_queue = queue.Queue()
-        
-        # Get the old queue
-        old_queue = self.queue
-        
-        # Replace the old queue with the new one
-        self.queue = new_queue
-        
-        # Process any remaining items in the old queue to clean up files
-        try:
-            while True:
-                audio_file = old_queue.get_nowait()
-                # Mark as done to avoid blocking
-                old_queue.task_done()
-                # Clean up the file if it exists
-                try:
-                    if os.path.exists(audio_file):
-                        os.unlink(audio_file)
-                except:
-                    pass
-        except queue.Empty:
-            # Queue is empty, nothing to do
-            pass
-    
-    def shutdown(self):
-        """Shutdown the voice thread."""
-        self.running = False
-        self.queue.put(None)  # Signal to stop
-        self.thread.join()
-
-
 async def generate_audio_file(text, voice):
     """Generate an audio file from text and return the path to the file."""
     try:
@@ -367,7 +169,7 @@ def get_initial_data_and_response(message: str, config: Config) -> tuple:
         "model": "gemma-3-27b-it",
         "temperature": config.get_temperature(persona),
         "messages": [
-            {"role": "system", "content": "Only respond with a single url and nothing else, prefer short urls, don't use youtube urls, do not use markdown or html, if the user mentions a url just return that url"},
+            {"role": "system", "content": "Only respond with a single url and nothing else, prefer common domains, don't use youtube urls, do not use markdown or html, if the user mentions a url just return that url"},
             {"role": "user", "content": message}
         ],
         "stream": False
@@ -409,26 +211,58 @@ Source: {extracted_url} (Last updated {today})
 Here is the query:
 {message}
 
-Answer the query based on the context and cite your source.
+Answer the query based on the context.
 """
+
+def check_for_urls(message: str) -> tuple[bool, str]:
+    """
+    Check if a message contains any URLs and return the first URL found.
+    
+    Args:
+        message (str): The message to check for URLs
+        
+    Returns:
+        tuple[bool, str]: A tuple containing (has_url, extracted_url)
+            - has_url (bool): True if a URL was found, False otherwise
+            - extracted_url (str): The first URL found, or None if no URL was found
+    """
+    url_pattern = r'https?://\S+'
+    url_matches = re.findall(url_pattern, message)
+    has_url = len(url_matches) > 0
+    extracted_url = url_matches[0] if has_url else None
+    return has_url, extracted_url
 
 def process_message(message: str, persona: str, config: Config, conversation_history: list = None, voice: str = None, script_dir: str = None, last_context: str = None) -> str:
    # Check if the persona has 'get_pre_context' in main
     original_message = message
     links_content = ''
     persona_config = config._get_persona_config(persona)
+    
+    # Check if the message contains a URL
+    has_url, extracted_url = check_for_urls(message)
+    
     if persona_config.get('get_pre_context', False):
-        # Prepare initial call to LLM API and rewrite the message
-        if (conversation_history is None):
-           limited_content, links_content, extracted_url = get_initial_data_and_response(message, config)
-           original_message = message
-           message = context_template(message, limited_content, extracted_url)
+        # If message contains a URL, fetch it directly
+        if has_url:
+            print(f"Grabbing the requested context from: {extracted_url}")
+            limited_content, links, status_code = download_and_extract_content(extracted_url)
+            if status_code == 200:
+                message = context_template(original_message, limited_content, extracted_url)
+            else:
+                # If URL fetch fails, use the normal flow
+                print("URL fetch failed")
+                message = context_template(original_message, 'Failed to fetch context from the provided url', extracted_url)
+        # Otherwise use the normal flow
+        elif conversation_history is None:
+            limited_content, links_content, extracted_url = get_initial_data_and_response(message, config)
+            original_message = message
+            message = context_template(message, limited_content, extracted_url)
         else:
-           if message.startswith('!') and not last_context is None:
-               message = message[1:]
-               limited_content, links_content, extracted_url = get_initial_data_and_response(context_template(message, last_context, ''), config)
-               original_message = message
-               message = context_template(message, limited_content, extracted_url)  
+            if message.startswith('!') and not last_context is None:
+                message = message[1:]
+                limited_content, links_content, extracted_url = get_initial_data_and_response(context_template(message, last_context, ''), config)
+                original_message = message
+                message = context_template(message, limited_content, extracted_url)  
 
     """Process the message and return the response."""
     if conversation_history is None:
@@ -456,7 +290,6 @@ def process_message(message: str, persona: str, config: Config, conversation_his
             # Stream the response and process it sentence by sentence
             full_response, voice_thread = stream_response(resp, voice, script_dir)
             
-            
             # Get additional input without going to a new line
             print(">> ", end='', flush=True)
             additional_input = input().strip()
@@ -466,7 +299,8 @@ def process_message(message: str, persona: str, config: Config, conversation_his
                 if voice_thread is not None:
                     voice_thread.shutdown()
                  
-                if additional_input.startswith('!'):
+                has_url, extracted_url = check_for_urls(additional_input)
+                if additional_input.startswith('!') or has_url:
                     conversation_history.pop()
                     conversation_history.append({ "role": "user", "content": original_message })
 
@@ -512,7 +346,7 @@ def extract_main_content_and_links(html: bytes, base_url: str) -> tuple:
         
         # Limit the number of tokens to 1024
         tokens = text_content.split()
-        limited_content = ' '.join(tokens[:3024])
+        limited_content = ' '.join(tokens[:7000])
         
         # Extract all links with text from the main content and ensure they are fully qualified
         links = [f"<a href='{urljoin(base_url, a['href'])}'>{a.get_text(strip=True)}</a>" for a in main_content.find_all('a', href=True) if a.get_text(strip=True)]
