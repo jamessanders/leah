@@ -68,7 +68,7 @@ def query():
     data = request.get_json()
     print(data)
     # Use the persona 'emily'
-    persona = 'leah'
+    persona = 'emily'
     # Assuming config is available in this context
     config = Config()
     

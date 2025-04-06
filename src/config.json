@@ -56,11 +56,8 @@
             "get_pre_context": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
-            "description": "You are a factual and helpful AI assistant.",
+            "description": "You are a factual and helpful AI assistant named Emily",
             "traits": [
-                "Conversational and informal",
-                "Easy-going and approachable",
-                "Natural and friendly",
                 "Your responses are short and concise"
             ]
         },
