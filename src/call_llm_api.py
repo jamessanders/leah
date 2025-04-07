@@ -1,6 +1,7 @@
 import json
 import urllib.request
 from typing import Any
+import socket
 
 
 def call_llm_api(data: dict, url: str, headers: dict) -> Any:
@@ -11,5 +12,4 @@ def call_llm_api(data: dict, url: str, headers: dict) -> Any:
     # Create request object
     req = urllib.request.Request(url, data=data, headers=headers, method='POST')
     
-    # Send request and return the response object without reading it
-    return urllib.request.urlopen(req) 
+    return urllib.request.urlopen(req)  # Read timeout 

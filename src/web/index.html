@@ -15,23 +15,7 @@
     <div id="root"></div>
     <script src="/deps/react.development.js" crossorigin></script>
     <script src="/deps/react-dom.development.js" crossorigin></script>
-    
     <script src="/deps/marked.min.js"></script>
-
     <script src="app.js" type="module"></script>
-    <script>
-        // Register service worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                    })
-                    .catch(err => {
-                        console.log('ServiceWorker registration failed: ', err);
-                    });
-            });
-        }
-    </script>
 </body>
 </html> 

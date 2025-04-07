@@ -89,16 +89,13 @@ def generate_voice_file(plain_text_content, voice, voice_dir, timestamp):
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
-    print("Received query")
-    print(data)
-    # Use the persona 'emily'
-    persona = 'leah'
+    # Get the persona from the request, default to 'leah' if not specified
+    persona = data.get('persona', 'leah')
     # Assuming config is available in this context
     config = Config()
     
     # Extract conversation history from the request
     conversation_history = data.get('history', [])
-    print(conversation_history)
 
     # Parse and validate the conversation history
     parsed_history = []
@@ -107,6 +104,10 @@ def query():
             parsed_history.append(entry)
         else:
             print(f"Invalid entry in conversation history: {entry}")
+
+    
+    # Add system message to the beginning of the conversation history
+    parsed_history.insert(0, {"role": "system", "content": config.get_system_content(persona)})
 
     # Check if the user's query contains a URL
     has_url, extracted_url = check_for_urls(data.get('query', ''))
@@ -122,9 +123,7 @@ def query():
         else:
             print("Failed to fetch content from the URL")
 
-    # Add system message to the beginning of the conversation history
-    parsed_history.insert(0, {"role": "system", "content": config.get_system_content(persona)})
-
+    
     # Prepare API data with the parsed conversation history
     api_data = {
         "model": config.get_model(persona),
@@ -136,6 +135,13 @@ def query():
     response = call_llm_api(api_data, config.get_ollama_url(), config.get_headers())
     
     def generate_stream():
+        # Send the conversation history at the end of the stream
+        history_info = {
+            "type": "history",
+            "history": parsed_history
+        }
+        yield f"data: {json.dumps(history_info)}\n\n"
+
         buffered_content = ""
         for line in response:
             line = line.decode('utf-8').strip()
@@ -159,7 +165,6 @@ def query():
                                 "filename": voice_filename
                             }
                             yield f"data: {json.dumps(voice_file_info)}\n\n"
-                            
                             # Reset the buffer
                             buffered_content = ""
                         yield f"data: {json.dumps({'content': content})}\n\n"
@@ -179,8 +184,14 @@ def query():
                 "filename": voice_filename
             }
             yield f"data: {json.dumps(voice_file_info)}\n\n"
-
+            
     return app.response_class(generate_stream(), mimetype='text/event-stream')
+
+@app.route('/personas', methods=['GET'])
+def get_personas():
+    config = Config()
+    personas = config.get_persona_choices()
+    return jsonify(personas)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001) 

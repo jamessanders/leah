@@ -1,18 +1,66 @@
 const App = () => {
+    // Load initial state from localStorage or use defaults
     const [inputValue, setInputValue] = React.useState('');
-    const [responses, setResponses] = React.useState([]);
+    const [responses, setResponses] = React.useState(() => {
+        const saved = localStorage.getItem('responses');
+        return saved ? JSON.parse(saved) : [];
+    });
     const [loading, setLoading] = React.useState(false);
+    const [personas, setPersonas] = React.useState([]);
+    const [selectedPersona, setSelectedPersona] = React.useState(() => {
+        return localStorage.getItem('selectedPersona') || 'leah';
+    });
     const inputRef = React.useRef(null);
     const responseAreaRef = React.useRef(null);
     const audioRef = React.useRef(null);
-    const [conversationHistory, setConversationHistory] = React.useState([]);
+    const [conversationHistory, setConversationHistory] = React.useState(() => {
+        const saved = localStorage.getItem('conversationHistory');
+        return saved ? JSON.parse(saved) : [];
+    });
     const [audioQueue, setAudioQueue] = React.useState([]);
     const [queue, setQueue] = React.useState([]);
     const [isPlaying, setIsPlaying] = React.useState(false);
     const [isMobile, setIsMobile] = React.useState(false);
 
     const userAvatarUrl = 'https://via.placeholder.com/40?text=U'; // Placeholder for user avatar
-    const assistantAvatarUrl = '/img/avatar-jane.png'; // Placeholder for assistant avatar
+    const assistantAvatarUrl = `/img/avatar-${selectedPersona}.png`;
+
+    // Save state to localStorage whenever it changes
+    React.useEffect(() => {
+        localStorage.setItem('responses', JSON.stringify(responses));
+    }, [responses]);
+
+    React.useEffect(() => {
+        localStorage.setItem('conversationHistory', JSON.stringify(conversationHistory));
+    }, [conversationHistory]);
+
+    React.useEffect(() => {
+        localStorage.setItem('selectedPersona', selectedPersona);
+    }, [selectedPersona]);
+
+    // Fetch available personas on component mount
+    React.useEffect(() => {
+        const fetchPersonas = async () => {
+            try {
+                const response = await fetch('/personas');
+                const data = await response.json();
+                setPersonas(data);
+            } catch (error) {
+                console.error('Error fetching personas:', error);
+            }
+        };
+        fetchPersonas();
+    }, []);
+
+    const handlePersonaChange = (event) => {
+        setSelectedPersona(event.target.value);
+        // Clear conversation history when changing personas
+        setConversationHistory([]);
+        setResponses([]);
+        // Clear localStorage for conversation history
+        localStorage.removeItem('conversationHistory');
+        localStorage.removeItem('responses');
+    };
 
     const handleInputChange = (event) => {
         setInputValue(event.target.value);
@@ -44,7 +92,11 @@ const App = () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ query: inputValue, history: updatedHistory }),
+                body: JSON.stringify({ 
+                    query: inputValue, 
+                    history: updatedHistory,
+                    persona: selectedPersona 
+                }),
             });
 
             const reader = res.body.getReader();
@@ -56,7 +108,7 @@ const App = () => {
                 const { done, value } = await reader.read();
                 if (done) break;
                 const chunk = decoder.decode(value, { stream: true });
-                console.log(chunk);
+                console.log("CHUNK",chunk);
 
                 // Split the chunk into individual JSON objects
                 const jsonObjects = chunk.split('\n\n').filter(Boolean);
@@ -83,6 +135,9 @@ const App = () => {
                             });
                         } else if (jsonResponse.voice_type && jsonResponse.filename) {
                             addToAudioQueue("/voice/" + jsonResponse.filename); // Add to the audio queue
+                        } else if (jsonResponse.type === "history" && jsonResponse.history) {
+                            // Update the conversation history with the server's version
+                            setConversationHistory(jsonResponse.history);
                         }
                     } catch (error) {
                         console.log(jsonObject);
@@ -110,6 +165,7 @@ const App = () => {
                 }
             });
         } catch (error) {
+            console.log("ERROR",error);
             console.error('Error:', error);
         } finally {
             setLoading(false); // Hide loading message
@@ -178,6 +234,21 @@ const App = () => {
     }, []);
     
     return React.createElement('div', null,
+        React.createElement('div', { className: 'header' },
+            React.createElement('h1', null, ''),
+            React.createElement('select', {
+                className: 'personaSelector',
+                value: selectedPersona,
+                onChange: handlePersonaChange
+            },
+                personas.map(persona =>
+                    React.createElement('option', {
+                        key: persona,
+                        value: persona
+                    }, persona.charAt(0).toUpperCase() + persona.slice(1))
+                )
+            )
+        ),
         React.createElement('div', { className: 'responseArea', ref: responseAreaRef },
             responses.map((item, index) =>
                 React.createElement('div', {

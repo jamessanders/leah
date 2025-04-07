@@ -29,6 +29,7 @@ class Config:
         user_config_path = os.path.join(home_dir, '.hey.config.json')
         
         if os.path.exists(user_config_path):
+            print("User config found")
             try:
                 with open(user_config_path, 'r') as f:
                     user_config = json.load(f)
@@ -36,7 +37,7 @@ class Config:
                 # Merge user config with main config
                 config = self._merge_configs(config, user_config)
             except Exception as e:
-                pass
+                print(e)
         
         return config
     
