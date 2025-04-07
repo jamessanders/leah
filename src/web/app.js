@@ -23,7 +23,7 @@ const App = () => {
     const [isMobile, setIsMobile] = React.useState(false);
 
     const userAvatarUrl = 'https://via.placeholder.com/40?text=U'; // Placeholder for user avatar
-    const assistantAvatarUrl = `/img/avatar-${selectedPersona}.png`;
+    const assistantAvatarUrl = `/avatars/avatar-${selectedPersona}.png`;
 
     // Save state to localStorage whenever it changes
     React.useEffect(() => {
@@ -118,7 +118,12 @@ const App = () => {
                         const jsonResponse = JSON.parse(jsonObject.replace(/^data:\s*/, ''));
                         console.log(jsonResponse);
 
-                        if (jsonResponse.content) {
+                        if (jsonResponse.type === 'system' && jsonResponse.content) {
+                            // Handle system responses as user chat messages
+                            setResponses(prevResponses => {
+                                return [...prevResponses, { role: 'user', content: "<i>System: " + jsonResponse.content + "</i>" }];
+                            });
+                        } else if (jsonResponse.content) {
                             // Append content as plain text
                             const plainTextContent = jsonResponse.content;
                             assistantResponse += plainTextContent;
@@ -138,7 +143,7 @@ const App = () => {
                         } else if (jsonResponse.type === "history" && jsonResponse.history) {
                             // Update the conversation history with the server's version
                             setConversationHistory(jsonResponse.history);
-                        }
+                        } 
                     } catch (error) {
                         console.log(jsonObject);
                         console.error('Error parsing JSON:', error);
@@ -247,7 +252,20 @@ const App = () => {
                         value: persona
                     }, persona.charAt(0).toUpperCase() + persona.slice(1))
                 )
-            )
+            ),
+            React.createElement('div', {
+                onClick: () => {
+                    console.log("Resetting conversation history");
+                    // Clear conversation history when changing personas
+                    setConversationHistory([]);
+                    setResponses([]);
+                    // Clear localStorage for conversation history
+                    localStorage.removeItem('conversationHistory');
+                    localStorage.removeItem('responses');
+                },
+                className: 'resetButton',
+                style: { display: 'inline-block', padding: '10px 20px', fontSize: '16px', cursor: 'pointer', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '5px', marginLeft: '10px' }
+            }, 'Reset Conversation')
         ),
         React.createElement('div', { className: 'responseArea', ref: responseAreaRef },
             responses.map((item, index) =>

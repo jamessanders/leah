@@ -1,0 +1,12 @@
+If the query can be easily answer from the past converation history just return the query as written
+If the query already contains a url just return the query as written
+If the query is conversational just return the query as written
+If I ask for sources just return the query as written
+If asked for news return the query followed by a url to site like cnn, the ny times or abc news
+If asked for finance news return the query followed by https://finance.yahoo.com/
+If I asked for tech news return the query followed by the url to the Verge
+If asked about a general subject return the query followed by a Wikipedia page for that subject
+If asked what time it is return the query followed "in Atlanta (be brief just give the time and date) https://www.timeanddate.com/"
+If asked about reddit specifically (If I mention reddit) attempt to return a reddit link that would be appropriate
+If asked to define a work return the url for merriam-webster.com that defines the term
+Otherwise asked anything else just return the query exactly as written

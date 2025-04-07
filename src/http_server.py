@@ -10,7 +10,7 @@ import re
 import mimetypes
 from content_extractor import download_and_extract_content
 from urllib.parse import urlparse
-
+from get_initial_data_and_response import get_initial_data_and_response
 app = Flask(__name__)
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
@@ -88,6 +88,7 @@ def generate_voice_file(plain_text_content, voice, voice_dir, timestamp):
 
 @app.route('/query', methods=['POST'])
 def query():
+    system_responses = []
     data = request.get_json()
     # Get the persona from the request, default to 'leah' if not specified
     persona = data.get('persona', 'leah')
@@ -96,6 +97,11 @@ def query():
     
     # Extract conversation history from the request
     conversation_history = data.get('history', [])
+    print("Conversation history: ", conversation_history)
+    if len(conversation_history) < 2000:
+        print("No conversation history found, rewriting query")
+        data['query'] = get_initial_data_and_response(data.get('query', ''), config, conversation_history[:-1])
+        system_responses.append("Rewrote query as: " + data['query'])
 
     # Parse and validate the conversation history
     parsed_history = []
@@ -108,6 +114,7 @@ def query():
     
     # Add system message to the beginning of the conversation history
     parsed_history.insert(0, {"role": "system", "content": config.get_system_content(persona)})
+
 
     # Check if the user's query contains a URL
     has_url, extracted_url = check_for_urls(data.get('query', ''))
@@ -132,6 +139,8 @@ def query():
         "stream": True
     }
     
+    print("Calling LLM API with data: ", api_data)
+
     response = call_llm_api(api_data, config.get_ollama_url(), config.get_headers())
     
     def generate_stream():
@@ -141,6 +150,9 @@ def query():
             "history": parsed_history
         }
         yield f"data: {json.dumps(history_info)}\n\n"
+
+        for system_response in system_responses:
+            yield f"data: {json.dumps({'type': 'system', 'content': system_response})}\n\n"
 
         buffered_content = ""
         for line in response:
@@ -192,6 +204,16 @@ def get_personas():
     config = Config()
     personas = config.get_persona_choices()
     return jsonify(personas)
+
+@app.route('/avatars/<requested_avatar>')
+def serve_avatar(requested_avatar):
+    img_dir = os.path.join(WEB_DIR, 'img')
+    default_avatar = 'avatar.png'
+    # Check if the requested avatar exists
+    if os.path.exists(os.path.join(img_dir, requested_avatar)):
+        return send_from_directory(img_dir, requested_avatar)
+    else:
+        return send_from_directory(img_dir, default_avatar)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001) 

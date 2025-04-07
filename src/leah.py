@@ -22,6 +22,7 @@ from datetime import datetime
 from voice_thread import VoiceThread
 from config import Config
 from content_extractor import download_and_extract_content
+from get_initial_data_and_response import get_initial_data_and_response
 
 
 # Suppress pygame output
@@ -147,46 +148,6 @@ def stream_response(response, voice=None, script_dir=None):
     # The voice thread will continue running in the background
     return full_response, voice_thread
 
-
-def get_initial_data_and_response(message: str, config: Config) -> tuple:
-    """Prepare the initial data, get the response, and rewrite the message."""
-    # Use the default persona from config
-    persona = config.get_persona_choices()[0]
-
-    # Prepare initial data
-    initial_data = {
-        "model": "gemma-3-27b-it",
-        "temperature": config.get_temperature(persona),
-        "messages": [
-            {"role": "system", "content": "Only respond with a single url and nothing else, prefer common domains, don't use youtube urls, do not use markdown or html, if the user mentions a url just return that url"},
-            {"role": "user", "content": message}
-        ],
-        "stream": False
-    }
-    # Call the LLM API with the initial data
-    initial_response = call_llm_api(initial_data, config.get_ollama_url(), config.get_headers())
-    
-    # Process the initial response using 'with' syntax
-    with initial_response as response:
-        url_response = response.read().decode('utf-8')
-        
-        # Parse the message from the first choice in the response
-        response_data = json.loads(url_response)
-        if response_data.get('choices') and response_data['choices'][0].get('message', {}).get('content'):
-            parsed_message = response_data['choices'][0]['message']['content']
-            
-            # Use a rigorous URL parser
-            parsed_url = urlparse(parsed_message)
-            if parsed_url.scheme and parsed_url.netloc:
-                extracted_url = parsed_url.geturl()
-                print(f"Grabbing context from: {extracted_url}",)
-                limited_content, links, status_code = download_and_extract_content(extracted_url)
-                if (status_code != 200):
-                    return get_initial_data_and_response(message, config)
-                links_content = '\n'.join(links)
-                print("\n\n")
-                return limited_content, links_content, extracted_url
-        return message, '', ''
 
 def context_template(message: str, context: str, extracted_url: str) -> str:
     now = datetime.now()

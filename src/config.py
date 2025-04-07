@@ -87,6 +87,11 @@ class Config:
         """Get the temperature setting for the specified persona."""
         return self._get_persona_config(persona)['temperature']
     
+    def get_prompt_script(self, persona='default') -> str:
+        """Get the prompt script for the specified persona."""
+        print(self._get_persona_config(persona))
+        return self._get_persona_config(persona)['prompt_script']  
+    
     def get_voice(self, persona='default') -> str:
         """Get the voice for the specified persona."""
         return self._get_persona_config(persona)['voice']
