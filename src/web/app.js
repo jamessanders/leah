@@ -9,9 +9,10 @@ const App = () => {
     const [audioQueue, setAudioQueue] = React.useState([]);
     const [queue, setQueue] = React.useState([]);
     const [isPlaying, setIsPlaying] = React.useState(false);
+    const [isMobile, setIsMobile] = React.useState(false);
 
     const userAvatarUrl = 'https://via.placeholder.com/40?text=U'; // Placeholder for user avatar
-    const assistantAvatarUrl = '/img/avatar.png'; // Placeholder for assistant avatar
+    const assistantAvatarUrl = '/img/avatar-jane.png'; // Placeholder for assistant avatar
 
     const handleInputChange = (event) => {
         setInputValue(event.target.value);
@@ -19,6 +20,13 @@ const App = () => {
 
     const handleKeyPress = (event) => {
         if (event.key === 'Enter') {
+            handleSubmit();
+        }
+    };
+
+    const handleBlur = () => {
+        // On mobile, when keyboard is dismissed (blur event), submit if there's text
+        if (isMobile && inputValue.trim() !== '') {
             handleSubmit();
         }
     };
@@ -154,6 +162,20 @@ const App = () => {
         }
     }, [responses]);
 
+    // Detect if the device is mobile
+    React.useEffect(() => {
+        const checkIfMobile = () => {
+            const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            setIsMobile(isMobileDevice);
+        };
+        
+        checkIfMobile();
+        window.addEventListener('resize', checkIfMobile);
+        
+        return () => {
+            window.removeEventListener('resize', checkIfMobile);
+        };
+    }, []);
     
     return React.createElement('div', null,
         React.createElement('div', { className: 'responseArea', ref: responseAreaRef },
@@ -175,13 +197,14 @@ const App = () => {
                     dangerouslySetInnerHTML: { __html: item.content }
                 })
             )),
-            loading && React.createElement('div', { className: 'loadingMessage' }, 'Loading...')
+            loading && React.createElement('div', { className: 'loadingMessage' }, 'Thinking...')
         ),
         React.createElement('input', {
             type: 'text',
             value: inputValue,
             onChange: handleInputChange,
             onKeyPress: handleKeyPress,
+            onBlur: handleBlur,
             placeholder: 'Enter your query',
             className: 'queryInput',
             ref: inputRef

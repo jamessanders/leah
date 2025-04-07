@@ -5,14 +5,25 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background-color: #2b2d42;
-    color: #f0f0f0;
+    background-color: #111827;
+    color: #f3f4f6;
+    touch-action: manipulation; /* Prevents default touch behaviors like dragging */
+    -webkit-user-select: none; /* Prevents text selection on iOS */
+    user-select: none; /* Prevents text selection on modern browsers */
+    -webkit-touch-callout: none; /* Prevents callout to copy image on iOS */
+    -webkit-tap-highlight-color: transparent; /* Removes tap highlight on iOS */
+    overflow-x: hidden; /* Prevent horizontal scrolling */
+    width: 100%;
+    max-width: 100vw;
 }
 
 #root {
     display: flex;
     flex-direction: column;
     flex-grow: 1;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
 }
 
 .queryInput {
@@ -22,11 +33,13 @@ body {
     position: fixed;
     bottom: 0;
     left: 0;
-    border: 1px solid #555;
+    border: 2px solid #4b5563;
     outline: none;
     font-size: 16px;
-    background-color: #8d99ae;
-    color: #edf2f4;
+    background-color: #1f2937;
+    color: #f3f4f6;
+    z-index: 10;
+    max-width: 100%;
 }
 
 button {
@@ -37,45 +50,60 @@ p {
     margin: 0;
 }
 .responseBox {
-    background-color: #6a4c93;
+    background-color: #374151;
     border-radius: 10px 15px;
     padding: 15px;
     margin: 10px;
     max-width: 60%;
     word-wrap: break-word;
     align-self: flex-start;
-    color: #edf2f4;
+    color: #f3f4f6;
     font-size: 16px;
     line-height: 1.5;
+    box-shadow: 0 0 10px rgba(75, 85, 99, 0.2);
 }
 
 .userInputBox {
-    background-color: #4a4e69;
+    background-color: #6b7280;
     border-radius: 15px;
     padding: 15px;
     margin: 10px;
     max-width: 60%;
     word-wrap: break-word;
     align-self: flex-start;
-    color: #edf2f4;
+    color: #e5e7eb;
+    box-shadow: 0 0 10px rgba(75, 85, 99, 0.2);
 }
 
 .responseArea {
     flex-grow: 1;
     padding: 20px;
     overflow-y: auto;
-    background-color: #2b2d42;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    background-color: #111827;
+    box-shadow: 0 0 20px rgba(75, 85, 99, 0.1);
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 60px); /* Adjust based on your layout */
+    height: calc(100vh - 60px);
+    padding-bottom: 70px; /* Add padding at the bottom to prevent content from being hidden behind the input box */
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .loadingMessage {
     font-style: italic;
-    color: #8d99ae;
+    color: #9ca3af;
     margin: 10px;
+    animation: thinking 1.5s infinite;
+    text-shadow: 0 0 5px rgba(156, 163, 175, 0.3);
 }
+
+@keyframes thinking {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
 .userInputBox .avatar{
     display: none;
 }
@@ -84,13 +112,113 @@ p {
     display: flex;
     justify-content: left;
     align-items: top;
+    margin-right: 20px;
 }
 
 .avatar img {
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #6b7280;
+    box-shadow: 0 0 15px rgba(107, 114, 128, 0.3);
 }
 
 .content {
     flex: 1;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Media queries for responsive design */
+@media (max-width: 768px) {
+    .responseBox, .userInputBox {
+        max-width: 85%;
+        box-sizing: border-box;
+    }
+    
+    .responseArea {
+        padding: 15px;
+        width: 100%;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+        box-sizing: border-box;
+    }
+    
+    .queryInput {
+        position: relative;
+        bottom: auto;
+        margin-top: -20px; /* Move input box up by 30px (from 10px to -20px) */
+        border-radius: 8px;
+        -webkit-appearance: none; /* Removes default styling on iOS */
+        appearance: none;
+        width: 90%;
+        max-width: 90%;
+        box-sizing: border-box;
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+    }
+    
+    #root {
+        padding-bottom: 10px;
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .avatar {
+        width: 40px;
+        margin-right: 10px;
+    }
+    
+    .avatar img {
+        width: 38px;
+        height: 38px;
+    }
+    
+    /* Ensure images don't overflow */
+    img {
+        max-width: 100%;
+        height: auto;
+    }
+}
+
+/* For very small screens */
+@media (max-width: 480px) {
+    .responseBox, .userInputBox {
+        max-width: 90%;
+        box-sizing: border-box;
+    }
+    
+    .responseArea {
+        padding: 10px;
+        box-sizing: border-box;
+    }
+    
+    .queryInput {
+        padding: 10px;
+        margin-top: -30px; /* Move input box up by 30px on very small screens too */
+        width: 90%;
+        max-width: 90%;
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+    }
+    
+    .avatar {
+        width: 35px;
+        margin-right: 8px;
+    }
+    
+    .avatar img {
+        width: 33px;
+        height: 33px;
+    }
+    
+    /* Ensure all content fits within viewport */
+    * {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
 } 

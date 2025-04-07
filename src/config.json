@@ -48,7 +48,7 @@
             "voice": "en-US-AvaNeural",
             "description": "You are a casual and relaxed AI assistant named Leah",
             "traits": [
-                "Use markdown when appropriate"
+                "Your responses are short and concise"
             ]
         },
         "emily": {

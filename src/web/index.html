@@ -1,10 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" standalone fullscreen>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to My Web Server</title>
+    <meta name="theme-color" content="#374151">
+    <meta name="description" content="An AI assistant powered by advanced language models">
+    <title>Leah AI Assistant</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="/img/icon-192.png">
+    <link rel="icon" type="image/png" href="/img/icon-192.png">
 </head>
 <body>
     <div id="root"></div>
@@ -14,5 +19,19 @@
     <script src="/deps/marked.min.js"></script>
 
     <script src="app.js" type="module"></script>
+    <script>
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
 </body>
 </html> 

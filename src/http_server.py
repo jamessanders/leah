@@ -7,6 +7,7 @@ import edge_tts
 import asyncio
 from datetime import datetime
 import re
+import mimetypes
 from content_extractor import download_and_extract_content
 from urllib.parse import urlparse
 
@@ -14,13 +15,27 @@ app = Flask(__name__)
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 
+# Initialize mimetypes
+mimetypes.init()
+
 @app.route('/')
 def serve_index():
     return send_from_directory(WEB_DIR, 'index.html')
 
 @app.route('/<path:filename>')
 def serve_file(filename):
-    return send_from_directory(WEB_DIR, filename)
+    # Get the MIME type based on the file extension
+    mime_type, _ = mimetypes.guess_type(filename)
+    
+    # Special case for JavaScript files
+    if filename.endswith('.js'):
+        mime_type = 'text/javascript'
+    # If no MIME type is found, default to 'application/octet-stream'
+    elif mime_type is None:
+        mime_type = 'application/octet-stream'
+    
+    # Serve the file with the correct MIME type
+    return send_from_directory(WEB_DIR, filename, mimetype=mime_type)
 
 # Function to strip markdown
 def strip_markdown(text):
@@ -74,9 +89,10 @@ def generate_voice_file(plain_text_content, voice, voice_dir, timestamp):
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
+    print("Received query")
     print(data)
     # Use the persona 'emily'
-    persona = 'emily'
+    persona = 'leah'
     # Assuming config is available in this context
     config = Config()
     
@@ -167,4 +183,4 @@ def query():
     return app.response_class(generate_stream(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
-    app.run(port=8001) 
+    app.run(host='0.0.0.0', port=8001) 
