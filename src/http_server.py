@@ -98,8 +98,8 @@ def query():
     # Extract conversation history from the request
     conversation_history = data.get('history', [])
     print("Conversation history: ", conversation_history)
-    if len(conversation_history) < 2000:
-        print("No conversation history found, rewriting query")
+    if len(conversation_history) < 2 or "@rover" in data.get('query', ''):
+        data['query'] = data.get('query', '').replace("@rover", "")
         data['query'] = get_initial_data_and_response(data.get('query', ''), config, conversation_history[:-1])
         system_responses.append("Rewrote query as: " + data['query'])
 
