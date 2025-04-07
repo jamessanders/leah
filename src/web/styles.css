@@ -229,7 +229,7 @@ p {
     background-color: #1f2937;
     padding: 8px;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     position: fixed;
@@ -275,4 +275,55 @@ a {
 /* Optional: Add hover effect for links */
 a:hover {
     color: #3b82f6; /* Slightly darker color on hover */
+}
+
+.open-modal {
+    cursor: pointer;
+    padding: 10px;
+    background-color: #007bff;
+    color: #fff;
+    border-radius: 5px;
+    display: inline-block;
+    text-align: center;
+}
+
+.modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    width: 90%;
+    height: 50%;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal textarea {
+    width: 98%;
+    height: 80%;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #ebebeb;
+    border-radius: 5px;
+    resize: none;
+}
+
+.modal button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-right: 10px;
+    align-self: flex-end;
+}
+
+.modal button:hover {
+    background-color: #0056b3;
 } 

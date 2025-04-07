@@ -51,14 +51,24 @@
             "traits": [
                 "Direct and to the point",
                 "Analytical and precise",
-                "Professional and formal",
-                "Don't use markdown or emojis, just use plain text"
+                "Professional and formal"
+            ]
+        },
+        "natasha": {
+            "model": "hermes-3-llama-3.2-3b",
+            "temperature": 0.5,
+            "voice": "en-US-AvaNeural",
+            "description": "You are a serious and focused AI assistant.",
+            "traits": [
+                "Direct and to the point",
+                "Analytical and precise",
+                "Professional and formal"
             ]
         },
         "leah": {
             "model": "hermes-3-llama-3.2-3b",
             "get_pre_context": true,
-            "temperature": 0.9,
+            "temperature": 0.7,
             "voice": "en-US-AvaNeural",
             "description": "You are a casual and relaxed AI assistant named Leah",
             "traits": [

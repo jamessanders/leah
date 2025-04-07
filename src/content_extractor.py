@@ -23,7 +23,8 @@ def extract_main_content_and_links(html: bytes, base_url: str) -> str:
     
     # Limit the number of tokens to 1024
     tokens = main_content.split()
-    limited_content = ' '.join(tokens[:7000])
+    print("Tokens: ", len(tokens))
+    limited_content = ' '.join(tokens[:5000])
     
     # Convert limited content to markdown
     markdown_content = html2text.html2text(limited_content)

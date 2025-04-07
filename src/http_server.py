@@ -98,10 +98,6 @@ def query():
     # Extract conversation history from the request
     conversation_history = data.get('history', [])
     print("Conversation history: ", conversation_history)
-    if len(conversation_history) < 2 or "@rover" in data.get('query', ''):
-        data['query'] = data.get('query', '').replace("@rover", "")
-        data['query'] = get_initial_data_and_response(data.get('query', ''), config, conversation_history[:-1], config.get_model(persona))
-        system_responses.append("Rewrote query as: " + data['query'])
 
     # Parse and validate the conversation history
     parsed_history = []
@@ -110,26 +106,36 @@ def query():
             parsed_history.append(entry)
         else:
             print(f"Invalid entry in conversation history: {entry}")
-
     
-    # Add system message to the beginning of the conversation history
-    parsed_history.insert(0, {"role": "system", "content": config.get_system_content(persona)})
+    if data.get('context',''):
+        data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
+        parsed_history[-1]['content'] = data['query']
+    else:
+        if len(conversation_history) < 2 or "@rover" in data.get('query', ''):
+            data['query'] = data.get('query', '').replace("@rover", "")
+            data['query'] = get_initial_data_and_response(data.get('query', ''), config, conversation_history[:-1], config.get_model(persona))
+            system_responses.append("Rewrote query as: " + data['query'])
+        # Check if the user's query contains a URL
+        has_url, extracted_url = check_for_urls(data.get('query', ''))
+        if has_url:
+            print(f"Grabbing context from: {extracted_url}")
+            limited_content, links, status_code = download_and_extract_content(extracted_url)
+            if status_code == 200:
+                # Use context template to rewrite the query message
+                data['query'] = context_template(data['query'], limited_content, extracted_url)
+                # Update the last item in the history with the rewritten query
+                if parsed_history:
+                    parsed_history[-1]['content'] = data['query']
+            else:
+                print("Failed to fetch content from the URL")
 
+  
 
-    # Check if the user's query contains a URL
-    has_url, extracted_url = check_for_urls(data.get('query', ''))
-    if has_url:
-        print(f"Grabbing context from: {extracted_url}")
-        limited_content, links, status_code = download_and_extract_content(extracted_url)
-        if status_code == 200:
-            # Use context template to rewrite the query message
-            data['query'] = context_template(data['query'], limited_content, extracted_url)
-            # Update the last item in the history with the rewritten query
-            if parsed_history:
-                parsed_history[-1]['content'] = data['query']
-        else:
-            print("Failed to fetch content from the URL")
-
+    # Check if there's already a system message in the history
+    has_system_message = any(msg.get('role') == 'system' for msg in parsed_history)
+    if not has_system_message:
+        parsed_history.insert(0, {"role": "system", "content": config.get_system_content(persona)})
+   
     
     # Prepare API data with the parsed conversation history
     api_data = {
@@ -140,10 +146,10 @@ def query():
     }
     
     print("Calling LLM API with data: ", api_data)
-
-    response = call_llm_api(api_data, config.get_ollama_url(), config.get_headers())
     
     def generate_stream():
+        response = call_llm_api(api_data, config.get_ollama_url(), config.get_headers())
+
         # Send the conversation history at the end of the stream
         history_info = {
             "type": "history",
@@ -160,6 +166,9 @@ def query():
             if line.startswith('data: '):
                 try:
                     chunk = json.loads(line[6:])
+                    if isinstance(chunk, str):
+                        print("Chunk is a string: ", chunk)
+                        continue
                     if chunk.get('choices') and chunk['choices'][0].get('delta', {}).get('content'):
                         content = chunk['choices'][0]['delta']['content']
                         buffered_content += content

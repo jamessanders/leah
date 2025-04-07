@@ -21,6 +21,8 @@ const App = () => {
     const [queue, setQueue] = React.useState([]);
     const [isPlaying, setIsPlaying] = React.useState(false);
     const [isMobile, setIsMobile] = React.useState(false);
+    const [isModalOpen, setIsModalOpen] = React.useState(false);
+    const [modalInputValue, setModalInputValue] = React.useState('');
 
     const userAvatarUrl = 'https://via.placeholder.com/40?text=U'; // Placeholder for user avatar
     const assistantAvatarUrl = `/avatars/avatar-${selectedPersona}.png`;
@@ -86,6 +88,7 @@ const App = () => {
             setConversationHistory(updatedHistory);
             setResponses([...responses, { role: 'user', content: inputValue }]);
             setInputValue(''); // Clear the input field before submitting
+            setModalInputValue('');
 
             const res = await fetch('/query', {
                 method: 'POST',
@@ -95,7 +98,8 @@ const App = () => {
                 body: JSON.stringify({ 
                     query: inputValue, 
                     history: updatedHistory,
-                    persona: selectedPersona 
+                    persona: selectedPersona,
+                    context: modalInputValue // Pass modal input value as context
                 }),
             });
 
@@ -237,7 +241,19 @@ const App = () => {
             window.removeEventListener('resize', checkIfMobile);
         };
     }, []);
-    
+
+    const handleModalOpen = () => {
+        setIsModalOpen(true);
+    };
+
+    const handleModalClose = () => {
+        setIsModalOpen(false);
+    };
+
+    const handleModalInputChange = (event) => {
+        setModalInputValue(event.target.value);
+    };
+
     return React.createElement('div', null,
         React.createElement('div', { className: 'header' },
             React.createElement('h1', null, ''),
@@ -265,7 +281,8 @@ const App = () => {
                 },
                 className: 'resetButton',
                 style: { display: 'inline-block', padding: '10px 20px', fontSize: '16px', cursor: 'pointer', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '5px', marginLeft: '10px' }
-            }, 'Reset Conversation')
+            }, 'Reset'),
+            React.createElement('div', { onClick: handleModalOpen, className: 'open-modal', style: { marginLeft: '10px' } }, 'Context')
         ),
         React.createElement('div', { className: 'responseArea', ref: responseAreaRef },
             responses.map((item, index) =>
@@ -297,7 +314,17 @@ const App = () => {
             placeholder: 'Enter your query',
             className: 'queryInput',
             ref: inputRef
-        })
+        }),
+        isModalOpen && (
+            React.createElement('div', { className: 'modal' },
+                React.createElement('textarea', {
+                    value: modalInputValue,
+                    onChange: handleModalInputChange,
+                    placeholder: 'Enter your context here...'
+                }),
+                React.createElement('div', { onClick: handleModalClose, className: 'close-modal', style: { cursor: 'pointer', padding: '10px 20px', backgroundColor: '#007bff', color: '#fff', borderRadius: '5px', display: 'inline-block', textAlign: 'center', marginTop: '10px' } }, 'Close')
+            )
+        )
     );
 };
 
