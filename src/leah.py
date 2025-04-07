@@ -195,7 +195,7 @@ def process_message(message: str, persona: str, config: Config, conversation_his
         # If message contains a URL, fetch it directly
         if has_url:
             print(f"Grabbing the requested context from: {extracted_url}")
-            limited_content, links, status_code = download_and_extract_content(extracted_url)
+            limited_content = extract_main_content_and_links(html, url)
             if status_code == 200:
                 message = context_template(original_message, limited_content, extracted_url)
             else:
@@ -321,7 +321,7 @@ def download_and_extract_content(url: str) -> tuple:
             return None, None, status_code
         
         # Extract main content and links
-        limited_content, links = extract_main_content_and_links(html, url)
+        limited_content = extract_main_content_and_links(html, url)
         
         # Return the limited content and links separately in a tuple
         return limited_content, links, status_code

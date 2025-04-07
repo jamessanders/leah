@@ -5,16 +5,16 @@ import json
 
 def context_template(message: str, context: str) -> str:
     return f"""
-Here is some context for the query:
+context for the query:
 {context}
 
-Here is the query:
+the original query:
 {message}
 
-Answer the query based on the context.
+Answer the query based on the context given here, strictly follow the rules given here
 """
 
-def get_initial_data_and_response(message: str, config: Config, history: list) -> tuple:
+def get_initial_data_and_response(message: str, config: Config, history: list, model: str = None) -> tuple:
     """Prepare the initial data, get the response, and rewrite the message."""
     # Use the default persona from config
     persona = "rover"
@@ -31,7 +31,7 @@ def get_initial_data_and_response(message: str, config: Config, history: list) -
 
     # Prepare initial data
     initial_data = {
-        "model": config.get_model(persona),
+        "model": model if model else config.get_model(persona),
         "temperature": config.get_temperature(persona),
         "messages": [
             {"role": "system", "content": config.get_system_content(persona)}

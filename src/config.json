@@ -21,6 +21,10 @@
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
             "description": "You are a helpful and friendly AI assistant designed to rewrite prompts to gather more context",
+            "traits": [
+               "all responses must be in plain text",
+               "responses should be in the form of the original query followed by the URL"
+            ],
             "ui_hidden": true,
             "prompt_script": "rover.txt",
             "traits": []

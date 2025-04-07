@@ -100,7 +100,7 @@ def query():
     print("Conversation history: ", conversation_history)
     if len(conversation_history) < 2 or "@rover" in data.get('query', ''):
         data['query'] = data.get('query', '').replace("@rover", "")
-        data['query'] = get_initial_data_and_response(data.get('query', ''), config, conversation_history[:-1])
+        data['query'] = get_initial_data_and_response(data.get('query', ''), config, conversation_history[:-1], config.get_model(persona))
         system_responses.append("Rewrote query as: " + data['query'])
 
     # Parse and validate the conversation history

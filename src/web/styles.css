@@ -264,4 +264,15 @@ p {
 .personaSelector option {
     background-color: #1f2937;
     color: #f3f4f6;
+}
+
+a {
+    color: #60a5fa; /* A contrasting color for links */
+    text-decoration: underline; /* Underline links to make them stand out */
+    font-weight: bold; /* Make links bold */
+}
+
+/* Optional: Add hover effect for links */
+a:hover {
+    color: #3b82f6; /* Slightly darker color on hover */
 } 
