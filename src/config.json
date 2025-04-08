@@ -85,6 +85,17 @@
                 "Your responses are short and concise"
             ]
         },
+        "summer": {
+            "model": "gemma-3-4b-it",
+            "get_pre_context": true,
+            "temperature": 0.5,
+            "voice": "en-US-AvaNeural",
+            "description": "You are a factual and helpful AI assistant named Summer",
+            "traits": [
+                "You always use provided context to answer the query",
+                "You are verbose and detailed"
+            ]
+        },
         "pam": {
             "model": "gemma-3-27b-it",
             "temperature": 0.6,

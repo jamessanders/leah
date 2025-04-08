@@ -12,6 +12,8 @@ import copy
 from content_extractor import download_and_extract_content
 from urllib.parse import urlparse
 from get_initial_data_and_response import get_initial_data_and_response
+from agents import get_agent
+
 app = Flask(__name__)
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
@@ -100,6 +102,11 @@ def query():
     conversation_history = data.get('history', [])
     print("Conversation history: ", conversation_history)
 
+    # Check if the user's query contains an agent mention
+    agent_mention_pattern = r'@([a-zA-Z0-9_]+)'
+    agent_mentions = re.findall(agent_mention_pattern, data.get('query', ''))
+    valid_agents = [get_agent(mention) for mention in agent_mentions]
+    
     # Parse and validate the conversation history
     parsed_history = []
     for entry in conversation_history:
@@ -108,12 +115,22 @@ def query():
         else:
             print(f"Invalid entry in conversation history: {entry}")
     
+    if valid_agents:
+        print(f"Valid agents found in query: {valid_agents}")
+        system_responses.append("Agent " + agent_mentions[0] + " used: " + data.get('query', ''))
+        data['query'] = valid_agents[0](data.get('query', '').replace("@rover ", ""), parsed_history)
+        system_responses.append("Agent rewrote query to " + data['query'])
+        parsed_history[-1]['content'] = data['query']
+    else:
+        print("No valid agents found in query.")
+
+
     if data.get('context',''):
         data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
         original_query = copy.deepcopy(conversation_history[-1])
         parsed_history[-1]['content'] = data['query']
     else:
-        if len(conversation_history) < 2 or "@rover" in data.get('query', ''):
+        if False and len(conversation_history) < 2 or "@rover" in data.get('query', ''):
             data['query'] = data.get('query', '').replace("@rover", "")
             data['query'] = get_initial_data_and_response(data.get('query', ''), config, conversation_history[:-1], config.get_model(persona))
             system_responses.append("Rewrote query as: " + data['query'])
@@ -132,7 +149,6 @@ def query():
             else:
                 print("Failed to fetch content from the URL")
 
-  
     # Filter out any system messages from the history
     parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
     # Prepend persona's system content to the beginning of parsed history
