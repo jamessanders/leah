@@ -76,7 +76,7 @@
             ]
         },
         "emily": {
-            "model": "gemma-3-4b-it",
+            "model": "gemma-3-27b-it",
             "get_pre_context": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
@@ -86,14 +86,24 @@
             ]
         },
         "summer": {
-            "model": "gemma-3-4b-it",
+            "model": "gemma-3-27b-it",
             "get_pre_context": true,
-            "temperature": 0.5,
+            "temperature": 0.7,
             "voice": "en-US-AvaNeural",
             "description": "You are a factual and helpful AI assistant named Summer",
             "traits": [
                 "You always use provided context to answer the query",
                 "You are verbose and detailed"
+            ]
+        },
+        "decider": {
+            "model": "gemma-3-27b-it",
+            "temperature": 0.8,
+            "voice": "en-US-AvaNeural",
+            "description": "You are a factual and helpful AI assistant named Decider",
+            "traits": [
+               "You always use provided context to answer the query",
+               "You will only respond with 'yes' or 'no'"
             ]
         },
         "pam": {

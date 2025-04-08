@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Generator
 from call_llm_api import ask_agent
 import re
 from datetime import datetime
@@ -29,11 +29,11 @@ def get_urls(message: str) -> list[str]:
     extracted_url = url_matches if has_url else []
     return extracted_url
 
-def rover_agent(query: str, conversation_history: list[dict]) -> str:
+def rover_agent(query: str, conversation_history: list[dict]) -> Generator[tuple[str, str], None, None]:
+    yield ("message", "Rover is thinking...")
     rover_result = ask_agent("rover", query)
-    print("Rover result: ", rover_result)
+    yield("message", "Rover result: " + rover_result)
     extract_urls = get_urls(rover_result)
-    print("Rover result: ", extract_urls)
     pages = [x[0] for x in [download_and_extract_content(url) for url in extract_urls] if x[2] == 200]
     chunked_pages = []
     for page in pages:
@@ -44,25 +44,29 @@ def rover_agent(query: str, conversation_history: list[dict]) -> str:
     pages = chunked_pages
     summaries = []
     source = " ".join(extract_urls)
+    yield("message", "Extracting information from " + str(len(pages)) + " pages")
     for r in pages:
         if sum([len(x.split()) for x in summaries]) > 1500:
             break
         try:
-            summary = ask_agent("summer", "Here is some context from {source}: \n\n" + r + f"\n\nIf this content has infomation to answer the query '{query}', summarize the content in detail, list the key points and the most important details providing urls for the articles. Ignore the urls that are not articles.  Only use the provided context to answer the query. Only return the summary and no other text.")
+            summary = ask_agent("summer", "Here is some context from {source}: \n\n" + r + f"\n\noutput the main content exactly as it is.  Only use the provided context to answer the query.")
             summaries.append(summary)
+            yield("message", "Rover summary: " + summary)
         except Exception as e:
             print("Error: ", e)
             continue
     summary = "\n\n".join(summaries)
-    report = ask_agent("summer", "Here is the summary of the research documents: \n\n" + summary + f"\n\nBuild a comprehensive report based on the research documents and the query '{query}'.")
-    print("Final Report: ", report)
-    return context_template(query, report, "Research documents by @rover")
+    yield("message", "Compiling report...")
+    report = ask_agent("summer", "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.")
+    yield("message", "Final Report: " + report)
+    yield ("result", context_template(query, report, "Research documents by @rover"))
 
 def dive_agent(query: str, conversation_history: list[dict]) -> str:
     last_message = conversation_history[-1]['content']
     urls = " ".join(get_urls(last_message))
     print("Urls: ", urls)
-    return rover_agent(query + "\n\n" + "\n".join(urls), conversation_history)
+    yield ("message", "Diving into the research documents...")
+    yield from rover_agent(query + "\n\n" + "\n".join(urls), conversation_history)
 
 def get_agent(agent_name: str) -> Callable:
     if agent_name in agents:

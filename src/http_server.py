@@ -91,83 +91,88 @@ def generate_voice_file(plain_text_content, voice, voice_dir, timestamp):
 
 @app.route('/query', methods=['POST'])
 def query():
-    system_responses = []
     data = request.get_json()
-    # Get the persona from the request, default to 'leah' if not specified
-    persona = data.get('persona', 'leah')
-    # Assuming config is available in this context
-    config = Config()
-    
-    # Extract conversation history from the request
-    conversation_history = data.get('history', [])
-    print("Conversation history: ", conversation_history)
+    def generate_stream():    
+        system_responses = []
+        # Get the persona from the request, default to 'leah' if not specified
+        persona = data.get('persona', 'leah')
+        # Assuming config is available in this context
+        config = Config()
+        
+        # Extract conversation history from the request
+        conversation_history = data.get('history', [])
+        print("Conversation history: ", conversation_history)
 
-    # Check if the user's query contains an agent mention
-    agent_mention_pattern = r'@([a-zA-Z0-9_]+)'
-    agent_mentions = re.findall(agent_mention_pattern, data.get('query', ''))
-    valid_agents = [get_agent(mention) for mention in agent_mentions]
-    
-    # Parse and validate the conversation history
-    parsed_history = []
-    for entry in conversation_history:
-        if isinstance(entry, dict) and 'role' in entry and 'content' in entry:
-            parsed_history.append(entry)
-        else:
-            print(f"Invalid entry in conversation history: {entry}")
-    
-    if valid_agents:
-        print(f"Valid agents found in query: {valid_agents}")
-        system_responses.append("Agent " + agent_mentions[0] + " used: " + data.get('query', ''))
-        data['query'] = valid_agents[0](data.get('query', '').replace("@rover ", ""), parsed_history)
-        system_responses.append("Agent rewrote query to " + data['query'])
-        parsed_history[-1]['content'] = data['query']
-    else:
-        print("No valid agents found in query.")
-
-
-    if data.get('context',''):
-        data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
-        original_query = copy.deepcopy(conversation_history[-1])
-        parsed_history[-1]['content'] = data['query']
-    else:
-        if False and len(conversation_history) < 2 or "@rover" in data.get('query', ''):
-            data['query'] = data.get('query', '').replace("@rover", "")
-            data['query'] = get_initial_data_and_response(data.get('query', ''), config, conversation_history[:-1], config.get_model(persona))
-            system_responses.append("Rewrote query as: " + data['query'])
-        # Check if the user's query contains a URL
-        has_url, extracted_url = check_for_urls(data.get('query', ''))
-        if has_url:
-            print(f"Grabbing context from: {extracted_url}")
-            limited_content, links, status_code = download_and_extract_content(extracted_url)
-            if status_code == 200:
-                # Use context template to rewrite the query message
-                data['query'] = context_template(data['query'], limited_content, extracted_url)
-                # Update the last item in the history with the rewritten query
-                if parsed_history:
-                    original_query = copy.deepcopy(conversation_history[-1])
-                    parsed_history[-1]['content'] = data['query']
+        # Check if the user's query contains an agent mention
+        agent_mention_pattern = r'@([a-zA-Z0-9_]+)'
+        agent_mentions = re.findall(agent_mention_pattern, data.get('query', ''))
+        valid_agents = [get_agent(mention) for mention in agent_mentions]
+        
+        # Parse and validate the conversation history
+        parsed_history = []
+        for entry in conversation_history:
+            if isinstance(entry, dict) and 'role' in entry and 'content' in entry:
+                parsed_history.append(entry)
             else:
-                print("Failed to fetch content from the URL")
+                print(f"Invalid entry in conversation history: {entry}")
+        
+        if valid_agents:
+            print(f"Valid agents found in query: {valid_agents}")
+            system_responses.append("Agent " + agent_mentions[0] + " used: " + data.get('query', ''))
+            for result in valid_agents[0](data.get('query', '').replace("@rover ", ""), parsed_history):
+                if (result[0] == "message"):
+                    yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
+                elif (result[0] == "result"):
+                    data['query'] = result[1]
+                    system_responses.append("Agent rewrote query to " + data['query'])
+                    parsed_history[-1]['content'] = data['query']
+                    yield "data: {json.dumps({'type': 'system', 'content': 'Rovers resport: '" + result[1] + "})}\n\n"
+        else:
+            print("No valid agents found in query.")
+            if data.get('context',''):
+                data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
+                original_query = copy.deepcopy(conversation_history[-1])
+                parsed_history[-1]['content'] = data['query']
+            else:
+                if False and len(conversation_history) < 2 or "@rover" in data.get('query', ''):
+                    data['query'] = data.get('query', '').replace("@rover", "")
+                    data['query'] = get_initial_data_and_response(data.get('query', ''), config, conversation_history[:-1], config.get_model(persona))
+                    system_responses.append("Rewrote query as: " + data['query'])
+                # Check if the user's query contains a URL
+                has_url, extracted_url = check_for_urls(data.get('query', ''))
+                if not valid_agents and has_url:
+                    print(f"Grabbing context from: {extracted_url}")
+                    limited_content, links, status_code = download_and_extract_content(extracted_url)
+                    if status_code == 200:
+                        # Use context template to rewrite the query message
+                        data['query'] = context_template(data['query'], limited_content, extracted_url)
+                        # Update the last item in the history with the rewritten query
+                        if parsed_history:
+                            original_query = copy.deepcopy(conversation_history[-1])
+                            parsed_history[-1]['content'] = data['query']
+                    else:
+                        print("Failed to fetch content from the URL")
 
-    # Filter out any system messages from the history
-    parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
-    # Prepend persona's system content to the beginning of parsed history
-    system_content = config.get_system_content(persona)
-    if system_content:
-        parsed_history.insert(0, {"role": "system", "content": system_content})
+        
 
+        # Filter out any system messages from the history
+        parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
+        # Prepend persona's system content to the beginning of parsed history
+        system_content = config.get_system_content(persona)
+        if system_content:
+            parsed_history.insert(0, {"role": "system", "content": system_content})
+
+        
+        # Prepare API data with the parsed conversation history
+        api_data = {
+            "model": config.get_model(persona),
+            "temperature": config.get_temperature(persona),
+            "messages": parsed_history,
+            "stream": True
+        }
+        
+        print("Calling LLM API with data: ", api_data)
     
-    # Prepare API data with the parsed conversation history
-    api_data = {
-        "model": config.get_model(persona),
-        "temperature": config.get_temperature(persona),
-        "messages": parsed_history,
-        "stream": True
-    }
-    
-    print("Calling LLM API with data: ", api_data)
-    
-    def generate_stream():
         response = call_llm_api(api_data, config.get_ollama_url(), config.get_headers())
 
         # Send the conversation history at the end of the stream
