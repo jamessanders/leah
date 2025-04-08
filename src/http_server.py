@@ -8,6 +8,7 @@ import asyncio
 from datetime import datetime
 import re
 import mimetypes
+import copy
 from content_extractor import download_and_extract_content
 from urllib.parse import urlparse
 from get_initial_data_and_response import get_initial_data_and_response
@@ -109,6 +110,7 @@ def query():
     
     if data.get('context',''):
         data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
+        original_query = copy.deepcopy(conversation_history[-1])
         parsed_history[-1]['content'] = data['query']
     else:
         if len(conversation_history) < 2 or "@rover" in data.get('query', ''):
@@ -125,17 +127,19 @@ def query():
                 data['query'] = context_template(data['query'], limited_content, extracted_url)
                 # Update the last item in the history with the rewritten query
                 if parsed_history:
+                    original_query = copy.deepcopy(conversation_history[-1])
                     parsed_history[-1]['content'] = data['query']
             else:
                 print("Failed to fetch content from the URL")
 
   
+    # Filter out any system messages from the history
+    parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
+    # Prepend persona's system content to the beginning of parsed history
+    system_content = config.get_system_content(persona)
+    if system_content:
+        parsed_history.insert(0, {"role": "system", "content": system_content})
 
-    # Check if there's already a system message in the history
-    has_system_message = any(msg.get('role') == 'system' for msg in parsed_history)
-    if not has_system_message:
-        parsed_history.insert(0, {"role": "system", "content": config.get_system_content(persona)})
-   
     
     # Prepare API data with the parsed conversation history
     api_data = {

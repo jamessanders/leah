@@ -56,12 +56,6 @@ const App = () => {
 
     const handlePersonaChange = (event) => {
         setSelectedPersona(event.target.value);
-        // Clear conversation history when changing personas
-        setConversationHistory([]);
-        setResponses([]);
-        // Clear localStorage for conversation history
-        localStorage.removeItem('conversationHistory');
-        localStorage.removeItem('responses');
     };
 
     const handleInputChange = (event) => {

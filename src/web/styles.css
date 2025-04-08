@@ -8,13 +8,27 @@ body {
     background-color: #111827;
     color: #f3f4f6;
     touch-action: manipulation; /* Prevents default touch behaviors like dragging */
-    -webkit-user-select: none; /* Prevents text selection on iOS */
-    user-select: none; /* Prevents text selection on modern browsers */
     -webkit-touch-callout: none; /* Prevents callout to copy image on iOS */
     -webkit-tap-highlight-color: transparent; /* Removes tap highlight on iOS */
     overflow-x: hidden; /* Prevent horizontal scrolling */
     width: 100%;
     max-width: 100vw;
+}
+
+/* Enable text selection for larger viewports */
+@media (min-width: 768px) {
+    body {
+        -webkit-user-select: text;
+        user-select: text;
+    }
+}
+
+/* Disable text selection for mobile devices */
+@media (max-width: 767px) {
+    body {
+        -webkit-user-select: none;
+        user-select: none;
+    }
 }
 
 #root {
