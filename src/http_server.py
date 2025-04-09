@@ -1,5 +1,6 @@
 from flask import Flask, send_from_directory, request, jsonify
 import os
+from NotesManager import NotesManager
 from call_llm_api import call_llm_api
 from config import Config
 import json
@@ -163,7 +164,12 @@ def query():
         # Prepend persona's system content to the beginning of parsed history
         system_content = config.get_system_content(persona)
         if system_content:
-            parsed_history.insert(0, {"role": "system", "content": system_content})
+            notesManager = NotesManager()
+            memories = notesManager.get_note("memories.txt")
+            if memories:
+                parsed_history.insert(0, {"role": "system", "content": system_content + "\n\n" + "This is everything you remember: " + memories})
+            else:
+                parsed_history.insert(0, {"role": "system", "content": system_content})
 
         
         # Prepare API data with the parsed conversation history
@@ -174,7 +180,7 @@ def query():
             "stream": True
         }
         
-        print("Calling LLM API with data: ", api_data)
+        print("REAL CALL Calling LLM API with data: ", api_data)
     
         response = call_llm_api(api_data, config.get_ollama_url(), config.get_headers())
 
@@ -188,6 +194,8 @@ def query():
         for system_response in system_responses:
             yield f"data: {json.dumps({'type': 'system', 'content': system_response})}\n\n"
 
+
+        full_response = ""
         buffered_content = ""
         for line in response:
             line = line.decode('utf-8').strip()
@@ -200,6 +208,7 @@ def query():
                     if chunk.get('choices') and chunk['choices'][0].get('delta', {}).get('content'):
                         content = chunk['choices'][0]['delta']['content']
                         buffered_content += content
+                        full_response += content
                         # Check if the buffered content ends with a sentence-ending punctuation
                         if buffered_content.endswith(('.', '!', '?')) and len(buffered_content) > 256:
                             # Generate voice for the complete sentence
@@ -233,7 +242,22 @@ def query():
                 "filename": voice_filename
             }
             yield f"data: {json.dumps(voice_file_info)}\n\n"
-            
+
+        after_response = config.get_after_response(persona)
+        print("After response: ", after_response)
+        if after_response:
+            agent_name = after_response.split("@")[1]
+            print("Agent name: ", agent_name)
+            agent = get_agent(agent_name)
+            print("Agent: ", agent)
+            parsed_history.append({"role": "assistant", "content": full_response})
+            parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
+            for result in agent("", parsed_history):
+                if result[0] == "message":
+                    yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
+                elif result[0] == "result":
+                    yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
+
     return app.response_class(generate_stream(), mimetype='text/event-stream')
 
 @app.route('/personas', methods=['GET'])

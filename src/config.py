@@ -106,3 +106,7 @@ class Config:
     def get_persona_choices(self) -> list:
         """Get the list of available personas."""
         return list(self.config['personas'].keys()) 
+    
+    def get_after_response(self, persona='default') -> str:
+        """Get the after response for the specified persona."""
+        return self._get_persona_config(persona).get('after_response', None)

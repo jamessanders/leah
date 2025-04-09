@@ -21,7 +21,7 @@ Here is the query:
 Answer the query based on the context.
 """
 
-def ask_agent(persona: str, query: str, stream: bool = False) -> str:
+def ask_agent(persona: str, query: str, stream: bool = False, conversation_history: list[dict] = []) -> str:
     config = Config()
     model = config.get_model(persona)
     system_content = config.get_system_content(persona)
@@ -34,11 +34,15 @@ def ask_agent(persona: str, query: str, stream: bool = False) -> str:
             script_content = f.read()
             query = context_template(query, script_content, "User provided context")
    
-    # Prepare API data with the parsed conversation history
+    # Filter out system messages from conversation history
+    filtered_history = [msg for msg in conversation_history if msg.get('role') != 'system']
+    messages = [{"role": "system", "content": system_content}, *filtered_history, {"role": "user", "content": query}]
+    
+    # Prepare API data with filtered conversation history
     api_data = {
         "model": model,
         "temperature": config.get_temperature(persona),
-        "messages": [{"role": "system", "content": system_content}, {"role": "user", "content": query}],
+        "messages": messages,
         "stream": stream
     }
     print("Calling LLM API with: ", api_data)

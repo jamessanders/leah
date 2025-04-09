@@ -5,7 +5,7 @@
     },
     "personas": {
         "default": {
-            "model": "gemma-3-27b-it",
+            "model": "gemma-3-4b-it",
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
             "description": "You are a helpful and friendly AI assistant.",
@@ -17,7 +17,7 @@
             ]
         },
         "rover": {
-            "model": "gemma-3-12b-it",
+            "model": "gemma-3-4b-it",
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
             "description": "You are a helpful and friendly AI assistant designed to rewrite prompts to gather more context",
@@ -30,43 +30,20 @@
             "traits": []
         },
         "broker": {
-            "model": "gemma-3-12b-it",
+            "model": "gemma-3-4b-it",
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
             "description": "You are an AI assistant designed categorize prompts",
             "traits": [
-            "you will only respond with a category prepended with '@'",
+             "you will only respond as instructed below",
              "if the prompt is asking about time answer @time",   
-             "if the prompt is asking about location answer @location",
-             "if the prompt is asking about a person answer @person",
-             "if the prompt is asking about a thing answer @thing",
-             "if the prompt is asking about a company answer @company",
-             "if the prompt is asking about a country answer @country",
-             "if the prompt is asking about a language answer @language",
-             "if the prompt is asking about a food answer @food",
-             "if the prompt is asking about a movie answer @movie",
-             "if the prompt is asking about a book answer @book",
-             "if the prompt is asking about a song answer @song",
-             "if the prompt is asking about a sport answer @sport",
-             "if the prompt is asking about a tv show answer @tvshow",
-             "if the prompt is asking about a news article answer @news",
-             "if the prompt is asking about a recipe answer @recipe",
-             "if the prompt is asking about a product answer @product",
-             "if the prompt is asking about a service answer @service",
-             "if the prompt is asking about a technology answer @technology",
-             "if the prompt is asking about a weather answer @weather",
              "if the prompt is asking about a joke answer @joke",
-             "if the prompt is asking about a fact answer @fact",
-             "if the prompt is asking about a quote answer @quote",
-             "if the prompt is asking about a poem answer @poem",
-             "if the prompt is asking about a story answer @story",
-             "if the prompt is asking about a definition answer @definition",
-             "if the prompt is asking about a list answer @list",
-             "if the prompt is asking about a map answer @map",
-             "if the prompt is asking about a calendar answer @calendar",
-             "if the prompt is asking about a schedule answer @schedule",
-             "if the prompt is asking about a reminder answer @reminder",
-             "if the prompt is asking about a todo list answer @todo",
+             "if the prompt is asking to learn something answer @learn",
+             "if the prompt is asking to store a note answer @notes",
+             "if the prompt is asking to check notes for answer @notes",
+             "if the prompt is asking you to remember something answer @notes",
+             "if the prompt ask you to take note of something answer @notes",
+             "anytime notes are mentioned answer @notes",
              "For all other prompts answer @other"
             ]
         },
@@ -85,7 +62,7 @@
             ]
         },
         "frank": {
-            "model": "gemma-3-27b-it",
+            "model": "gemma-3-4b-it",
             "temperature": 0.5,
             "voice": "en-US-AndrewNeural",
             "description": "You are a serious and focused AI assistant.",
@@ -117,17 +94,18 @@
             ]
         },
         "emily": {
-            "model": "gemma-3-12b-it",
+            "model": "gemma-3-4b-it",
             "get_pre_context": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
             "description": "You are a factual and helpful AI assistant named Emily",
+            "after_response": "@update_long_term_memory",
             "traits": [
                 "Your responses are short and concise"
             ]
         },
         "summer": {
-            "model": "gemma-3-12b-it",
+            "model": "gemma-3-4b-it",
             "get_pre_context": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
@@ -138,7 +116,7 @@
             ]
         },
         "decider": {
-            "model": "gemma-3-12b-it",
+            "model": "gemma-3-4b-it",
             "temperature": 0.8,
             "voice": "en-US-AvaNeural",
             "description": "You are a factual and helpful AI assistant named Decider",
@@ -148,7 +126,7 @@
             ]
         },
         "pam": {
-            "model": "gemma-3-27b-it",
+            "model": "gemma-3-4b-it",
             "temperature": 0.6,
             "voice": "en-US-DavisNeural",
             "description": "You are a professional and polished AI assistant.",

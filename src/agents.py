@@ -3,6 +3,7 @@ from call_llm_api import ask_agent
 import re
 from datetime import datetime
 from content_extractor import download_and_extract_content, download_and_extract_links, download_and_extract_rss
+from NotesManager import NotesManager
 
 def context_template(message: str, context: str, extracted_url: str) -> str:
     now = datetime.now()
@@ -17,6 +18,17 @@ Here is the query:
 {message}
 
 Answer the query using the context provided above.
+"""
+
+def notes_template(message: str, context: str) -> str:
+    return f"""
+Here are all of the users notes:
+{context}
+
+Here is the query:
+{message}
+
+Answer the query using the users notes provided above.
 """
 
 def noop_agent(query: str, conversation_history: list[dict]) -> str:
@@ -121,8 +133,11 @@ def news_agent(query: str, conversation_history: list[dict]) -> str:
 def broker_agent(query: str, conversation_history: list[dict]) -> str:
     yield ("message", "Broker is thinking...")
     response = ask_agent("broker", query)
-    yield ("message", "Broker: " + response)
-    yield ("result", response + " " + query)
+    if not "@" in response:
+        yield ("result", query)
+    else:
+        yield ("message", "Broker: " + response)
+        yield ("result", response + " " + query)
 
 def time_agent(query: str, conversation_history: list[dict]) -> str:
     timeAndDate = "The time is " + datetime.now().strftime("%H:%M:%S") + "\n\nThe date is " + datetime.now().strftime("%B %d, %Y") + "\n\n" 
@@ -134,7 +149,51 @@ def weather_agent(query: str, conversation_history: list[dict]) -> str:
 
 def learn_agent(query: str, conversation_history: list[dict]) -> str:
     yield ("message", "Learning...")
-    yield ("result", f"@rover {query} (from wikipedia)")
+    result = ask_agent("rover", query + "from wikipedia")
+    yield ("result", f"@link {result}")
+
+def notes_agent(query: str, conversation_history: list[dict]) -> str:
+    yield ("message", "Checking notes...")
+    notesManager = NotesManager()
+    decider = ask_agent("decider", "Query was" + query + "\n\nDid the query ask to store something in notes, take note of something, or remember something?")
+    print("Decider when asked should store a note: ", decider)
+    if "yes" in decider.lower():
+        note_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt"
+        notesManager.put_note(note_name, ask_agent("emily", "Query was" + query + "\n\nWhat is the note that the user wants to store?"))
+        print("Note stored at " + note_name)
+        yield ("message", "Note stored at " + note_name)
+        yield ("result", "Say: Note stored at " + note_name)
+    else:
+        notes = notesManager.get_all_notes_content()
+        print("Notes: ", notes)
+        yield ("result", notes_template(query, notes))
+
+def remember_this_agent(query: str, conversation_history: list[dict]) -> str:
+    yield ("message", "Remembering this...")
+    result = ask_agent("emily", "Write a very detailed summary this entire conversation that happened on this date: " + datetime.now().strftime("%Y-%m-%d") + " at " + datetime.now().strftime("%H:%M:%S"), conversation_history=conversation_history)
+    print("Result: ", result)
+    notesManager = NotesManager()
+    notesManager.put_note(datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt", result)
+    yield ("result", "Just say: " + result)
+
+def remember_agent(query: str, conversation_history: list[dict]) -> str:
+    yield ("message", "Remembering this...")
+    notesManager = NotesManager()
+    notesManager.put_note(datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt", query)
+    yield ("result", "Just say you will remember this: " + query)
+
+def update_long_term_memory_agent(query: str, conversation_history: list[dict]) -> str:
+    yield ("message", "Updating long term memory...")
+    print("Updating long term memory...")
+    notesManager = NotesManager()
+    memories = notesManager.get_note("memories.txt")
+    if not memories:
+        notesManager.put_note("memories.txt", "I am a helpful assistant that can remember things.")
+        memories = notesManager.get_note("memories.txt")
+    result = ask_agent("emily", "Here is the document of things you remember: " + memories + "\n\nRead the document and update it with any details that should be added from this conversation about any subject mentioned in the entire conversation (the current time is " + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "), don't ask any follow up questions or start with a greeting.", conversation_history=conversation_history)
+    print("Result: ", result)
+    notesManager.put_note("memories.txt", result)
+    yield ("message", "Updated memories")
 
 def get_agent(agent_name: str) -> Callable:
     if agent_name in agents:
@@ -154,5 +213,10 @@ agents = {
     "rss": rss_agent,
     "weather": weather_agent,
     "learn": learn_agent,
-    "person": learn_agent
+    "person": learn_agent,
+    ##"notes": notes_agent,
+    ##"todo": noop_agent,
+    "remember_this": remember_this_agent,
+    "remember": remember_agent,
+    "update_long_term_memory": update_long_term_memory_agent
 }
