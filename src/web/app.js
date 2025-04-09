@@ -157,14 +157,16 @@ const App = () => {
 
             // Overwrite the UI with the converted HTML content
             setResponses(prevResponses => {
-                const lastResponse = prevResponses[prevResponses.length - 1];
-                if (lastResponse.role === 'assistant') {
+                // Filter out system messages
+                const filteredResponses = prevResponses.filter(response => !response.content.includes('<i>System:'));
+                const lastResponse = filteredResponses[filteredResponses.length - 1];
+                if (lastResponse && lastResponse.role === 'assistant') {
                     // Overwrite the last assistant response
                     lastResponse.content = htmlResponse;
-                    return [...prevResponses.slice(0, -1), lastResponse];
+                    return [...filteredResponses.slice(0, -1), lastResponse];
                 } else {
                     // Add a new assistant response
-                    return [...prevResponses, { role: 'assistant', content: htmlResponse }];
+                    return [...filteredResponses, { role: 'assistant', content: htmlResponse }];
                 }
             });
         } catch (error) {

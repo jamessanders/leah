@@ -89,8 +89,23 @@ def generate_voice_file(plain_text_content, voice, voice_dir, timestamp):
     asyncio.run(generate_voice())
     return f'response_{timestamp}.mp3'
 
+def system_message(message: str) -> str:
+    json_message = json.dumps({'type': 'system', 'content': message})
+    return f"data: {json_message}\n\n"
+
 @app.route('/query', methods=['POST'])
 def query():
+
+    def getAnAgent(query: str) -> str:
+        if not query or not isinstance(query, str):
+            return None
+        agent_mention_pattern = r'^@([a-zA-Z0-9_]+)'
+        agent_mentions = re.findall(agent_mention_pattern, query)
+        if not agent_mentions:
+            return None
+        valid_agents = [get_agent(mention) for mention in agent_mentions]
+        return valid_agents
+    
     data = request.get_json()
     def generate_stream():    
         system_responses = []
@@ -103,10 +118,6 @@ def query():
         conversation_history = data.get('history', [])
         print("Conversation history: ", conversation_history)
 
-        # Check if the user's query contains an agent mention
-        agent_mention_pattern = r'@([a-zA-Z0-9_]+)'
-        agent_mentions = re.findall(agent_mention_pattern, data.get('query', ''))
-        valid_agents = [get_agent(mention) for mention in agent_mentions]
         
         # Parse and validate the conversation history
         parsed_history = []
@@ -115,11 +126,26 @@ def query():
                 parsed_history.append(entry)
             else:
                 print(f"Invalid entry in conversation history: {entry}")
-        
-        if valid_agents:
+
+        if not getAnAgent(data.get('query', '')):
+            agent = get_agent("broker")   
+            for type, message in agent(data.get('query', ''), parsed_history):
+                if type == "message":
+                    yield system_message(message)
+                elif type == "result":
+                    data['query'] = message
+                    print("Broker rewrote query to " + data['query'])
+                    print(message)
+                    yield system_message("Broker rewrote query to " + data['query'])
+                    break
+
+        while True:
+            valid_agents = getAnAgent(data.get('query', ''))
+            if not valid_agents:
+                break
             print(f"Valid agents found in query: {valid_agents}")
-            system_responses.append("Agent " + agent_mentions[0] + " used: " + data.get('query', ''))
-            for result in valid_agents[0](data.get('query', '').replace("@rover ", ""), parsed_history):
+            print("The query is: " + data.get('query', ''))
+            for result in valid_agents[0](re.sub(r'^@[a-zA-Z]+', '', data.get('query', '')), parsed_history):
                 if (result[0] == "message"):
                     yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
                 elif (result[0] == "result"):
@@ -127,33 +153,6 @@ def query():
                     system_responses.append("Agent rewrote query to " + data['query'])
                     parsed_history[-1]['content'] = data['query']
                     yield "data: {json.dumps({'type': 'system', 'content': 'Rovers resport: '" + result[1] + "})}\n\n"
-        else:
-            print("No valid agents found in query.")
-            if data.get('context',''):
-                data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
-                original_query = copy.deepcopy(conversation_history[-1])
-                parsed_history[-1]['content'] = data['query']
-            else:
-                if False and len(conversation_history) < 2 or "@rover" in data.get('query', ''):
-                    data['query'] = data.get('query', '').replace("@rover", "")
-                    data['query'] = get_initial_data_and_response(data.get('query', ''), config, conversation_history[:-1], config.get_model(persona))
-                    system_responses.append("Rewrote query as: " + data['query'])
-                # Check if the user's query contains a URL
-                has_url, extracted_url = check_for_urls(data.get('query', ''))
-                if not valid_agents and has_url:
-                    print(f"Grabbing context from: {extracted_url}")
-                    limited_content, links, status_code = download_and_extract_content(extracted_url)
-                    if status_code == 200:
-                        # Use context template to rewrite the query message
-                        data['query'] = context_template(data['query'], limited_content, extracted_url)
-                        # Update the last item in the history with the rewritten query
-                        if parsed_history:
-                            original_query = copy.deepcopy(conversation_history[-1])
-                            parsed_history[-1]['content'] = data['query']
-                    else:
-                        print("Failed to fetch content from the URL")
-
-        
 
         # Filter out any system messages from the history
         parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']

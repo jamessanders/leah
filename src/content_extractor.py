@@ -52,6 +52,47 @@ def download_and_extract_links(url: str) -> list:
         return []
 
 
+def download_and_extract_rss(url: str) -> str:
+    """Download an RSS feed and convert it to markdown format."""
+    try:
+        # Send a request to the URL
+        with urllib.request.urlopen(url) as response:
+            rss_content = response.read()
+            
+        # Parse the RSS XML
+        document = lxml.html.fromstring(rss_content)
+        
+        # Extract items
+        items = document.xpath('//item')
+        
+        # Build markdown content
+        markdown = []
+        for item in items:
+            # Extract key elements
+            title = item.xpath('title/text()')
+            title = title[0] if title else ''
+            
+            link = item.xpath('link/text()')
+            link = link[0] if link else ''
+            
+            description = item.xpath('description/text()')
+            description = description[0] if description else ''
+            
+            pubDate = item.xpath('pubDate/text()')
+            pubDate = pubDate[0] if pubDate else ''
+            
+            # Convert to markdown format
+            markdown.append(f"## {title}\n")
+            markdown.append(f"*Published: {pubDate}*\n")
+            markdown.append(f"{description}\n")
+            markdown.append(f"[Read more]({link})\n")
+            markdown.append("---\n")
+            
+        return "\n".join(markdown)
+        
+    except Exception as e:
+        return f"Error downloading or parsing RSS feed: {e}"
+
 
 def download_and_extract_content(url: str) -> tuple:
     """Download an HTML page from a URL and extract the main content, limited to 4048 tokens, and return the HTTP status code."""
