@@ -28,3 +28,5 @@ temp.mp3
 # Voice directory
 voice/ 
 src/web/img/
+src/web/cache/
+.cache/
