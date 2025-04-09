@@ -190,15 +190,32 @@ const App = () => {
         }, [queue, isPlaying]);
       
         const playAudio = async (audioClipUri) => {
+          console.log('Attempting to play audio with Web Audio API:', audioClipUri);
+          if (!audioClipUri) {
+              console.error('No audio URI provided');
+              return;
+          }
           setIsPlaying(true);
           const audioUrl = await audioClipUri;
-          const audio = new Audio(audioUrl);
-          audio.onended = () => {
-            URL.revokeObjectURL(audioUrl); // To avoid memory leaks
-            setQueue((oldQueue) => oldQueue.slice(1));
-            setIsPlaying(false);
-          };
-          audio.play();
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          try {
+              const response = await fetch(audioUrl);
+              const arrayBuffer = await response.arrayBuffer();
+              const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+              const source = audioContext.createBufferSource();
+              source.buffer = audioBuffer;
+              source.connect(audioContext.destination);
+              source.onended = () => {
+                  setQueue((oldQueue) => oldQueue.slice(1));
+                  setIsPlaying(false);
+                  audioContext.close();
+              };
+              source.start(0);
+          } catch (error) {
+              console.error('Error with Web Audio API playback:', error);
+              setIsPlaying(false);
+              audioContext.close();
+          }
         };
       
         const addToAudioQueue = (audioClipUri) => {

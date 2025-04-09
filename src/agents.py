@@ -2,7 +2,7 @@ from typing import Callable, Generator
 from call_llm_api import ask_agent
 import re
 from datetime import datetime
-from content_extractor import download_and_extract_content
+from content_extractor import download_and_extract_content, download_and_extract_links
 
 def context_template(message: str, context: str, extracted_url: str) -> str:
     now = datetime.now()
@@ -34,6 +34,7 @@ def rover_agent(query: str, conversation_history: list[dict]) -> Generator[tuple
     rover_result = ask_agent("rover", query)
     yield("message", "Rover result: " + rover_result)
     extract_urls = get_urls(rover_result)
+    links = "\n".join([download_and_extract_links(url) for url in extract_urls])
     pages = [x[0] for x in [download_and_extract_content(url) for url in extract_urls] if x[2] == 200]
     chunked_pages = []
     for page in pages:
@@ -47,7 +48,9 @@ def rover_agent(query: str, conversation_history: list[dict]) -> Generator[tuple
     yield("message", "Extracting information from " + str(len(pages)) + " pages")
     for r in pages:
         if sum([len(x.split()) for x in summaries]) > 1500:
-            break
+            report = ask_agent("summer", "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.")
+            summaries = [report]
+            yield("message", "Compiled report: " + report)
         try:
             summary = ask_agent("summer", "Here is some context from {source}: \n\n" + r + f"\n\noutput the main content exactly as it is.  Only use the provided context to answer the query.")
             summaries.append(summary)
@@ -58,8 +61,9 @@ def rover_agent(query: str, conversation_history: list[dict]) -> Generator[tuple
     summary = "\n\n".join(summaries)
     yield("message", "Compiling report...")
     report = ask_agent("summer", "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.")
-    yield("message", "Final Report: " + report)
-    yield ("result", context_template(query, report, "Research documents by @rover"))
+    reportWithLinks = ask_agent("summer", "Here is context: \n\nReport: \n\n" + report + "\n\nLinks: \n\n" + links + f"\n\nInclude the links in the report without changing the report.")
+    yield("message", "Final Report: " + reportWithLinks)
+    yield ("result", context_template(query, reportWithLinks, "Research documents by @rover"))
 
 def dive_agent(query: str, conversation_history: list[dict]) -> str:
     last_message = conversation_history[-1]['content']

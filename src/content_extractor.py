@@ -16,10 +16,14 @@ def extract_main_content_and_links(html: bytes, base_url: str) -> str:
     cleaner = Cleaner()
     cleaner.javascript = True  # Remove JavaScript
     cleaner.style = True       # Remove styles
+    cleaner.links = True       # Remove links
     cleaned_content = cleaner.clean_html(document)
     
     # Convert cleaned content to string
     main_content = lxml.html.tostring(cleaned_content, encoding='unicode')
+    
+    # Remove all links from the content
+    main_content = re.sub(r'<a\b[^>]*>.*?</a>', '', main_content)
     
     # Limit the number of tokens to 1024
     tokens = main_content.split()
@@ -30,6 +34,23 @@ def extract_main_content_and_links(html: bytes, base_url: str) -> str:
     markdown_content = html2text.html2text(limited_content)
     
     return markdown_content
+
+def download_and_extract_links(url: str) -> list:
+    """Download an HTML page from a URL and extract the links, limited to 1024 tokens."""
+    try:
+        # Send a request to the URL
+        with urllib.request.urlopen(url) as response:
+            html = response.read()  
+        # Extract links from the content
+        links = re.findall(r'<a\b[^>]*>.*?</a>', html.decode('utf-8'))
+        # Remove duplicates using a set
+        links = list(set(links))
+        # Trim the list of links to a maximum of 64
+        links = links[:128]
+        return html2text.html2text("\n".join(links))
+    except Exception as e:
+        return []
+
 
 
 def download_and_extract_content(url: str) -> tuple:

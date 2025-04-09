@@ -4,6 +4,7 @@ from typing import Any
 import socket
 from config import Config
 from datetime import datetime
+from cache_manager import CacheManager
 
 def context_template(message: str, context: str, extracted_url: str) -> str:
     now = datetime.now()
@@ -41,13 +42,28 @@ def ask_agent(persona: str, query: str, stream: bool = False) -> str:
         "stream": stream
     }
     print("Calling LLM API with: ", api_data)
-    response = call_llm_api(api_data, url, headers)
+
+    if not stream:
+        cache = CacheManager()
+        cache_key = f"llm_response_{persona}_{query}"
+        cached_response = cache.get(cache_key)
+        if cached_response:
+            return cached_response
+
+    try:
+        response = call_llm_api(api_data, url, headers)
+    except Exception as e:
+        print("Error calling LLM API: ", e)
+        return "An error occurred while calling the LLM API."
+    
     if stream:
         return response
     else:
         result = response.read().decode('utf-8')
         print("Result: ", result)
-        return "".join([choice["message"]["content"] for choice in json.loads(result)["choices"]])
+        final_result = "".join([choice["message"]["content"] for choice in json.loads(result)["choices"]])
+        cache.set(cache_key, final_result)
+        return final_result
 
 def call_llm_api(data: dict, url: str, headers: dict) -> Any:
     print("Calling LLM API with: ", url, headers)

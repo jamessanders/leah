@@ -75,6 +75,7 @@ p {
     font-size: 16px;
     line-height: 1.5;
     box-shadow: 0 0 10px rgba(75, 85, 99, 0.2);
+    animation: fadeIn 0.3s ease-out forwards;
 }
 
 .userInputBox {
@@ -87,7 +88,7 @@ p {
     align-self: flex-start;
     color: #e5e7eb;
     box-shadow: 0 0 10px rgba(75, 85, 99, 0.2);
-    opacity: 0.25;
+    animation: userMessageFade 0.5s ease-out forwards;
 }
 
 .responseArea {
@@ -118,6 +119,17 @@ p {
     0% { opacity: 0.6; }
     50% { opacity: 1; }
     100% { opacity: 0.6; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes userMessageFade {
+    0% { opacity: 0; transform: translateY(10px); }
+    50% { opacity: 0.7; transform: translateY(0); }
+    100% { opacity: 0.25; transform: translateY(0); }
 }
 
 .userInputBox .avatar{
