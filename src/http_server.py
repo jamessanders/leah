@@ -154,6 +154,10 @@ def query():
                     parsed_history[-1]['content'] = data['query']
                     yield "data: {json.dumps({'type': 'system', 'content': 'Rovers resport: '" + result[1] + "})}\n\n"
 
+        if data.get('context',''):
+            data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
+            parsed_history[-1]['content'] = data['query']
+
         # Filter out any system messages from the history
         parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
         # Prepend persona's system content to the beginning of parsed history
