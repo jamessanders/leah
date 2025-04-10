@@ -8,7 +8,7 @@ import os
 import json
 from typing import Dict, Any
 from copy import deepcopy
-
+from datetime import datetime
 
 class Config:
     """Configuration management class for the Leah script."""
@@ -77,7 +77,7 @@ class Config:
     def get_system_content(self, persona='default') -> str:
         """Get the system content based on the specified persona."""
         persona_config = self._get_persona_config(persona)
-        return f"{persona_config['description']}\n" + "\n".join(f"- {trait}" for trait in persona_config['traits'])
+        return f"{persona_config['description']}\n" + "\n".join(f"- {trait}" for trait in persona_config['traits']) + "\n- the users current time and date is " + datetime.now().strftime("%I:%M %p on %A, %B %d %Y")
     
     def get_model(self, persona='default') -> str:
         """Get the model for the specified persona."""

@@ -23,6 +23,7 @@ const App = () => {
     const [isMobile, setIsMobile] = React.useState(false);
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [modalInputValue, setModalInputValue] = React.useState('');
+    const [submissionQueue, setSubmissionQueue] = React.useState([]);
 
     const userAvatarUrl = 'https://via.placeholder.com/40?text=U'; // Placeholder for user avatar
     const assistantAvatarUrl = `/avatars/avatar-${selectedPersona}.png`;
@@ -64,7 +65,7 @@ const App = () => {
 
     const handleKeyPress = (event) => {
         if (event.key === 'Enter') {
-            handleSubmit();
+            handleSubmit(event.target.value);
         }
     };
 
@@ -75,12 +76,34 @@ const App = () => {
         }
     };
 
-    const handleSubmit = async () => {
+    const processNextSubmission = React.useCallback(() => {
+        console.log("Attempting to process next submission");
+        console.log("Current queue:", submissionQueue);
+        if (submissionQueue.length > 0) {
+            const nextSubmission = submissionQueue[0];
+            console.log("Processing submission:", nextSubmission);
+            setSubmissionQueue(submissionQueue.slice(1));
+            handleSubmit(nextSubmission);
+        } else {
+            console.log("No submissions to process");
+        }
+    }, [submissionQueue]);
+
+    const handleSubmit = async (input = inputValue) => {
+        if (loading) {
+            setSubmissionQueue(prevQueue => [...prevQueue, input]);
+            console.log("Currently loading, queuing submission:", input);
+            setInputValue(''); // Clear the input field immediately when queuing
+            console.log("Updated submission queue (after queuing):", submissionQueue);
+            return;
+        }
+
+        console.log("Submitting input:", input);
         try {
             setLoading(true); // Show loading message
-            const updatedHistory = [...conversationHistory, { role: 'user', content: inputValue }];
+            const updatedHistory = [...conversationHistory, { role: 'user', content: input }];
             setConversationHistory(updatedHistory);
-            setResponses([...responses, { role: 'user', content: inputValue }]);
+            setResponses([...responses, { role: 'user', content: input }]);
             setInputValue(''); // Clear the input field before submitting
             setModalInputValue('');
 
@@ -90,7 +113,7 @@ const App = () => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ 
-                    query: inputValue, 
+                    query: input, 
                     history: updatedHistory,
                     persona: selectedPersona,
                     context: modalInputValue // Pass modal input value as context
@@ -106,7 +129,6 @@ const App = () => {
                 const { done, value } = await reader.read();
                 if (done) break;
                 const chunk = decoder.decode(value, { stream: true });
-                console.log("CHUNK",chunk);
 
                 // Split the chunk into individual JSON objects
                 const jsonObjects = chunk.split('\n\n').filter(Boolean);
@@ -114,13 +136,14 @@ const App = () => {
                     try {
                         // Strip the 'data:' prefix and parse the JSON response
                         const jsonResponse = JSON.parse(jsonObject.replace(/^data:\s*/, ''));
-                        console.log(jsonResponse);
 
                         if (jsonResponse.type === 'system' && jsonResponse.content) {
-                            // Handle system responses as user chat messages
-                            setResponses(prevResponses => {
-                                return [...prevResponses, { role: 'user', content: "<i>System: " + jsonResponse.content + "</i>" }];
-                            });
+                            console.log('System message:', jsonResponse.content);
+                        } else if (jsonResponse.type === 'end') {
+                            setLoading(false); // Hide loading message
+                            console.log("Finished processing submission, checking queue");
+                            console.log("DONE Submission queue:", submissionQueue);
+                            processNextSubmission(); // Process the next submission in the queue
                         } else if (jsonResponse.content) {
                             // Append content as plain text
                             const plainTextContent = jsonResponse.content;
@@ -143,7 +166,6 @@ const App = () => {
                             setConversationHistory(jsonResponse.history);
                         } 
                     } catch (error) {
-                        console.log(jsonObject);
                         console.error('Error parsing JSON:', error);
                     }
                 }
@@ -169,12 +191,9 @@ const App = () => {
                     return [...filteredResponses, { role: 'assistant', content: htmlResponse }];
                 }
             });
-        } catch (error) {
-            console.log("ERROR",error);
+        }    catch (error) {
             console.error('Error:', error);
-        } finally {
-            setLoading(false); // Hide loading message
-        }
+        } 
     };
 
     const useAudioPlayer = () => {

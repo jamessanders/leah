@@ -106,7 +106,7 @@
             ]
         },
         "summer": {
-            "model": "gemma-3-4b-it",
+            "model": "gemma-3-12b-it",
             "get_pre_context": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",

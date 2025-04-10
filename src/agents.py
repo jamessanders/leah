@@ -140,7 +140,7 @@ def broker_agent(query: str, conversation_history: list[dict]) -> str:
         yield ("result", response + " " + query)
 
 def time_agent(query: str, conversation_history: list[dict]) -> str:
-    timeAndDate = "The time is " + datetime.now().strftime("%H:%M:%S") + "\n\nThe date is " + datetime.now().strftime("%B %d, %Y") + "\n\n" 
+    timeAndDate = "The time and date is " + datetime.now().strftime("%I:%M %p on %A, %B %d %Y") + "\n\n" 
     yield ("result", context_template(query, timeAndDate, "Time by @time"))
 
 def weather_agent(query: str, conversation_history: list[dict]) -> str:

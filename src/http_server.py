@@ -14,6 +14,9 @@ from content_extractor import download_and_extract_content
 from urllib.parse import urlparse
 from get_initial_data_and_response import get_initial_data_and_response
 from agents import get_agent
+import threading
+import queue
+import time
 
 app = Flask(__name__)
 
@@ -21,6 +24,27 @@ WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 
 # Initialize mimetypes
 mimetypes.init()
+
+# Create a queue to hold the tuples
+cleanup_queue = queue.Queue()
+
+# Function to watch the queue and process items
+def watch_queue():
+    while True:
+        try:
+            # Wait for 2 minutes
+            time.sleep(180)
+            # Check if there is an item in the queue
+            if not cleanup_queue.empty():
+                # Get the item from the queue
+                persona, parsed_history, full_response = cleanup_queue.get()
+                # Process the item
+                after_request_cleanup(persona, parsed_history, full_response)
+        except Exception as e:
+            print(f"Error in watch_queue: {e}")
+
+# Start the background thread
+threading.Thread(target=watch_queue, daemon=True).start()
 
 @app.route('/')
 def serve_index():
@@ -93,6 +117,22 @@ def generate_voice_file(plain_text_content, voice, voice_dir, timestamp):
 def system_message(message: str) -> str:
     json_message = json.dumps({'type': 'system', 'content': message})
     return f"data: {json_message}\n\n"
+
+def after_request_cleanup(persona, parsed_history, full_response):
+    # Add any cleanup or logging logic here
+    print(f"Request has been fully processed for persona: {persona} with history: {parsed_history}")
+    notesManager = NotesManager()
+    memories = notesManager.get_note(f"memories_{persona}.txt")
+    if not memories:
+        notesManager.put_note(f"memories_{persona}.txt", "I am a helpful assistant that can remember things.")
+    memories = notesManager.get_note(f"memories_{persona}.txt")
+    parsed_history.append({"role": "assistant", "content": full_response})
+    parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
+    prompt = "Previous notes: " + memories + "\n\nEND OF PREVIOUS NOTES\n\nPrompt:Create detailed notes about the conversation be sure to include all the details about the user and the conversation topics, don't ask any follow up questions or start with a greeting. Include all the details from your previous notes as well. The notes should be no longer than 400 words."
+    result = ask_agent(persona, prompt, conversation_history=parsed_history)
+    #result = ask_agent(persona, "Context: " + memories + "\n\n" + result + "\n\n" + "Summarize the the context in detail as an inner monologue recounting every detail about the user topics discussed and your relationship to them, don't ask any follow up questions or start with a greeting. Do not remove any information from the context just reduce it to a more concise form.")
+    notesManager.put_note(f"memories_{persona}.txt", result)
+    
 
 @app.route('/query', methods=['POST'])
 def query():
@@ -167,7 +207,7 @@ def query():
             notesManager = NotesManager()
             memories = notesManager.get_note(f"memories_{persona}.txt")
             if memories:
-                parsed_history.insert(0, {"role": "system", "content": system_content + "\n\n" + "These are your thoughts and memories: " + memories})
+                parsed_history.insert(0, {"role": "system", "content": system_content + "\n\n" + "These are your notes from previous conversations: " + memories})
             else:
                 parsed_history.insert(0, {"role": "system", "content": system_content})
 
@@ -243,22 +283,23 @@ def query():
             }
             yield f"data: {json.dumps(voice_file_info)}\n\n"
 
+        yield f"data: {json.dumps({'type': 'end', 'content': 'END OF RESPONSE'})}\n\n"
+
+        # Add the current request to the cleanup queue after the response is sent
+        add_to_cleanup_queue(persona, parsed_history, full_response)
+
         after_response = config.get_after_response(persona)
         print("After response: ", after_response)
 
-        notesManager = NotesManager()
-        memories = notesManager.get_note(f"memories_{persona}.txt")
-        if not memories:
-            notesManager.put_note(f"memories_{persona}.txt", "I am a helpful assistant that can remember things.")
-        memories = notesManager.get_note(f"memories_{persona}.txt")
-        parsed_history.append({"role": "assistant", "content": full_response})
-        parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
-        prompt = "outline the entire conversation in detail as an inner monologue recounting all the details about the user, topics discussed and your relationship to them, don't ask any follow up questions or start with a greeting."
-        result = ask_agent(persona, prompt, conversation_history=parsed_history)
-        result = ask_agent(persona, "Context: " + memories + "\n\n" + result + "\n\n" + "Summarize the the context in detail as an inner monologue recounting every detail about the user topics discussed and your relationship to them, don't ask any follow up questions or start with a greeting. Do not remove any information from the context just reduce it to a more concise form.")
-        notesManager.put_note(f"memories_{persona}.txt", result)
-    
-            
+    # Method to add to the queue
+    def add_to_cleanup_queue(persona, parsed_history, full_response):
+        # Clear all existing items from the cleanup queue
+        while not cleanup_queue.empty():
+            try:
+                cleanup_queue.get_nowait()
+            except queue.Empty:
+                break
+        cleanup_queue.put((persona, parsed_history, full_response))
 
     return app.response_class(generate_stream(), mimetype='text/event-stream')
 
