@@ -1,7 +1,7 @@
 from flask import Flask, send_from_directory, request, jsonify
 import os
 from NotesManager import NotesManager
-from call_llm_api import call_llm_api
+from call_llm_api import call_llm_api, ask_agent
 from config import Config
 import json
 import edge_tts
@@ -96,7 +96,7 @@ def system_message(message: str) -> str:
 
 @app.route('/query', methods=['POST'])
 def query():
-
+    use_broker = False
     def getAnAgent(query: str) -> str:
         if not query or not isinstance(query, str):
             return None
@@ -128,7 +128,7 @@ def query():
             else:
                 print(f"Invalid entry in conversation history: {entry}")
 
-        if not getAnAgent(data.get('query', '')):
+        if not getAnAgent(data.get('query', '')) and use_broker:
             agent = get_agent("broker")   
             for type, message in agent(data.get('query', ''), parsed_history):
                 if type == "message":
@@ -165,9 +165,9 @@ def query():
         system_content = config.get_system_content(persona)
         if system_content:
             notesManager = NotesManager()
-            memories = notesManager.get_note("memories.txt")
+            memories = notesManager.get_note(f"memories_{persona}.txt")
             if memories:
-                parsed_history.insert(0, {"role": "system", "content": system_content + "\n\n" + "This is everything you remember: " + memories})
+                parsed_history.insert(0, {"role": "system", "content": system_content + "\n\n" + "These are your thoughts and memories: " + memories})
             else:
                 parsed_history.insert(0, {"role": "system", "content": system_content})
 
@@ -245,18 +245,20 @@ def query():
 
         after_response = config.get_after_response(persona)
         print("After response: ", after_response)
-        if after_response:
-            agent_name = after_response.split("@")[1]
-            print("Agent name: ", agent_name)
-            agent = get_agent(agent_name)
-            print("Agent: ", agent)
-            parsed_history.append({"role": "assistant", "content": full_response})
-            parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
-            for result in agent("", parsed_history):
-                if result[0] == "message":
-                    yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
-                elif result[0] == "result":
-                    yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
+
+        notesManager = NotesManager()
+        memories = notesManager.get_note(f"memories_{persona}.txt")
+        if not memories:
+            notesManager.put_note(f"memories_{persona}.txt", "I am a helpful assistant that can remember things.")
+        memories = notesManager.get_note(f"memories_{persona}.txt")
+        parsed_history.append({"role": "assistant", "content": full_response})
+        parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
+        prompt = "outline the entire conversation in detail as an inner monologue recounting all the details about the user, topics discussed and your relationship to them, don't ask any follow up questions or start with a greeting."
+        result = ask_agent(persona, prompt, conversation_history=parsed_history)
+        result = ask_agent(persona, "Context: " + memories + "\n\n" + result + "\n\n" + "Summarize the the context in detail as an inner monologue recounting every detail about the user topics discussed and your relationship to them, don't ask any follow up questions or start with a greeting. Do not remove any information from the context just reduce it to a more concise form.")
+        notesManager.put_note(f"memories_{persona}.txt", result)
+    
+            
 
     return app.response_class(generate_stream(), mimetype='text/event-stream')
 

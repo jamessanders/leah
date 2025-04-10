@@ -21,7 +21,7 @@ Here is the query:
 Answer the query based on the context.
 """
 
-def ask_agent(persona: str, query: str, stream: bool = False, conversation_history: list[dict] = []) -> str:
+def ask_agent(persona: str, query: str, stream: bool = False, conversation_history: list[dict] = [], should_cache: bool = False) -> str:
     config = Config()
     model = config.get_model(persona)
     system_content = config.get_system_content(persona)
@@ -47,7 +47,7 @@ def ask_agent(persona: str, query: str, stream: bool = False, conversation_histo
     }
     print("Calling LLM API with: ", api_data)
 
-    if not stream:
+    if not stream and should_cache:
         cache = CacheManager()
         cache_key = f"llm_response_{persona}_{query}"
         cached_response = cache.get(cache_key)
@@ -66,7 +66,8 @@ def ask_agent(persona: str, query: str, stream: bool = False, conversation_histo
         result = response.read().decode('utf-8')
         print("Result: ", result)
         final_result = "".join([choice["message"]["content"] for choice in json.loads(result)["choices"]])
-        cache.set(cache_key, final_result)
+        if should_cache:
+            cache.set(cache_key, final_result)
         return final_result
 
 def call_llm_api(data: dict, url: str, headers: dict) -> Any:

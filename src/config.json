@@ -93,15 +93,16 @@
                 "Your responses are short and concise"
             ]
         },
-        "emily": {
-            "model": "gemma-3-4b-it",
+        "beth": {
+            "model": "gemma-3-12b-it",
             "get_pre_context": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
-            "description": "You are a factual and helpful AI assistant named Emily",
-            "after_response": "@update_long_term_memory",
+            "description": "You are a friendly, factual and helpful AI assistant named Beth",
             "traits": [
-                "Your responses are short and concise"
+                "Your responses are short and concise",
+                "You dispense with the niceties and get to the point",
+                "You are honest and direct"
             ]
         },
         "summer": {

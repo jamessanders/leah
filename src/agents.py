@@ -170,7 +170,8 @@ def notes_agent(query: str, conversation_history: list[dict]) -> str:
 
 def remember_this_agent(query: str, conversation_history: list[dict]) -> str:
     yield ("message", "Remembering this...")
-    result = ask_agent("emily", "Write a very detailed summary this entire conversation that happened on this date: " + datetime.now().strftime("%Y-%m-%d") + " at " + datetime.now().strftime("%H:%M:%S"), conversation_history=conversation_history)
+    print("Conversation history: ", conversation_history)
+    result = [x for x in conversation_history if x["role"] == "assistant"][-1]['content']
     print("Result: ", result)
     notesManager = NotesManager()
     notesManager.put_note(datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt", result)
@@ -190,7 +191,7 @@ def update_long_term_memory_agent(query: str, conversation_history: list[dict]) 
     if not memories:
         notesManager.put_note("memories.txt", "I am a helpful assistant that can remember things.")
         memories = notesManager.get_note("memories.txt")
-    result = ask_agent("emily", "Here is the document of things you remember: " + memories + "\n\nRead the document and update it with any details that should be added from this conversation about any subject mentioned in the entire conversation (the current time is " + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "), don't ask any follow up questions or start with a greeting.", conversation_history=conversation_history)
+    result = ask_agent("emily", "summarize the conversation in detail as an inner monologue recounting details about the user and your relationship to them, don't ask any follow up questions or start with a greeting.", conversation_history=conversation_history)
     print("Result: ", result)
     notesManager.put_note("memories.txt", result)
     yield ("message", "Updated memories")
@@ -214,7 +215,7 @@ agents = {
     "weather": weather_agent,
     "learn": learn_agent,
     "person": learn_agent,
-    ##"notes": notes_agent,
+    "notes": notes_agent,
     ##"todo": noop_agent,
     "remember_this": remember_this_agent,
     "remember": remember_agent,

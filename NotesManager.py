@@ -10,7 +10,7 @@ class NotesManager:
         """Retrieve the content of a specific note file."""
         note_path = os.path.join(self.notes_directory, note_name)
         if os.path.exists(note_path):
-            with open(note_path, 'r') as file:
+            with open(note_path, 'r', encoding='utf-8') as file:
                 return file.read()
         else:
             return None
@@ -18,7 +18,7 @@ class NotesManager:
     def put_note(self, note_name: str, content: str) -> None:
         """Store content into a specific note file."""
         note_path = os.path.join(self.notes_directory, note_name)
-        with open(note_path, 'w') as file:
+        with open(note_path, 'w', encoding='utf-8') as file:
             file.write(content)
 
     def get_all_notes_content(self) -> str:
@@ -29,7 +29,7 @@ class NotesManager:
             if (not note_path.endswith(".txt")):
                 continue
             if os.path.isfile(note_path):
-                with open(note_path, 'r') as file:
+                with open(note_path, 'r', encoding='utf-8') as file:
                     print("Note: ", note_name)
                     all_content.append(note_name + ":\n" + file.read())
         return "\n".join(all_content) 
