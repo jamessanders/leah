@@ -43,53 +43,14 @@ def get_urls(message: str) -> list[str]:
     extracted_url = url_matches if has_url else []
     return extracted_url
 
-def rss_agent(query: str, conversation_history: list[dict]) -> str:
-    extract_urls = get_urls(query)
-    pages = [x[0] for x in [download_and_extract_rss(url) for url in extract_urls] if x[2] == 200]
-    chunked_pages = []
-    for page in pages:
-        words = page.split()
-        for i in range(0, len(words), 1000):
-            chunk = ' '.join(words[i:i+1000])
-            chunked_pages.append(chunk)
-    pages = chunked_pages
-    summaries = []
-    source = " ".join(extract_urls)
-    yield("message", "Extracting information from " + str(len(pages)) + " pages")
-    for r in pages:
-        if sum([len(x.split()) for x in summaries]) > 1500:
-            report = ask_agent("summer", 
-                               "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.", 
-                               should_cache=True)
-            summaries = [report]
-            yield("message", "Compiled report: " + report)
-        try:
-            summary = ask_agent("summer", 
-                                "Here is some context from {source}: \n\n" + r + f"\n\noutput the main content exactly as it is.  Only use the provided context to answer the query.",
-                                should_cache=True)
-            summaries.append(summary)
-            yield("message", "Rover summary: " + summary)
-        except Exception as e:
-            print("Error: ", e)
-            continue
-    summary = "\n\n".join(summaries)
-    yield("message", "Compiling report...")
-    report = ask_agent("summer", 
-                       "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.", 
-                       should_cache=True)
-    reportWithLinks = report
-    yield("message", "Final Report: " + reportWithLinks)
-    query = re.sub(r'https?://\S+', '', query).strip()
-    yield ("result", context_template(query, reportWithLinks, "Research documents by @rover"))
-
-def rawlink_agent(query: str, conversation_history: list[dict]) -> str:
-    extract_urls = get_urls(query)
+def rawlink_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
+    extract_urls = get_urls(" ".join(arguments))
     contents = [download_and_extract_content(url) for url in extract_urls]
     contents = "\n".join([c[0] for c in contents if c[2] == 200])
     yield ("result", context_template(query, contents, " ".join(extract_urls)))
 
-def link_agent(query: str, conversation_history: list[dict]) -> str:
-    extract_urls = get_urls(query)
+def link_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
+    extract_urls = get_urls(" ".join(arguments))
     links = "\n".join([download_and_extract_links(url) for url in extract_urls])
     pages = [x[0] for x in [download_and_extract_content(url) for url in extract_urls] if x[2] == 200]
     chunked_pages = []
@@ -131,25 +92,13 @@ def link_agent(query: str, conversation_history: list[dict]) -> str:
     query = re.sub(r'https?://\S+', '', query).strip()
     yield ("result", context_template(query, reportWithLinks, "Research documents by @rover"))
 
-def rover_agent(query: str, conversation_history: list[dict]) -> Generator[tuple[str, str], None, None]:
-    yield ("message", "Rover is thinking...")
-    rover_result = ask_agent("rover", query)
-    yield("message", "Rover result: " + rover_result)
-    yield ("result", "@link " + rover_result)
-
-def dive_agent(query: str, conversation_history: list[dict]) -> str:
-    last_message = conversation_history[-1]['content']
-    urls = " ".join(get_urls(last_message))
-    print("Urls: ", urls)
-    yield ("message", "Diving into the research documents...")
-    yield from rover_agent(query + "\n\n" + "\n".join(urls), conversation_history)
 
 def joke_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
-    yield ("result", f"@link {query} https://www.skiptomylou.org/funny-jokes/")
+    yield from rawlink_agent(query, conversation_history, arguments=["https://www.skiptomylou.org/funny-jokes/"])
 
-def news_agent(query: str, conversation_history: list[dict]) -> str:
+def news_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
     yield ("message", "Getting the latest news...")
-    yield ("result", f"@link {query} https://lite.cnn.com/")
+    yield from rawlink_agent(query, conversation_history, arguments=["https://lite.cnn.com/"])
 
 def broker_agent(query: str, conversation_history: list[dict]) -> str:
     yield ("message", "Broker is thinking...")
@@ -166,12 +115,8 @@ def time_agent(query: str, conversation_history: list[dict], arguments: list[str
 
 def weather_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
     yield ("message", "Getting the latest weather...")
-    yield ("result", f"@rawlink {query} https://forecast.weather.gov/MapClick.php?lat=35.2334&lon=-82.7343")
+    yield from rawlink_agent(query, conversation_history, arguments=["https://forecast.weather.gov/MapClick.php?lat=35.2334&lon=-82.7343"])
 
-def learn_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
-    yield ("message", "Learning...")
-    result = ask_agent("rover", query + "from wikipedia", should_cache=True)
-    yield ("result", f"@link {result}")
 
 def notes_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
     yield ("message", "Checking notes...")
@@ -233,20 +178,14 @@ def get_agent(agent_name: str) -> Callable:
         return None
 
 agents = {
-    "rover": rover_agent,
-    "dive": dive_agent,
     "joke": joke_agent,
     "news": news_agent,
     "noop": noop_agent,
     "broker": broker_agent,
     "link": link_agent,
     "time": time_agent,
-    "rss": rss_agent,
     "weather": weather_agent,
-    "learn": learn_agent,
-    "person": learn_agent,
     "notes": notes_agent,
-    ##"todo": noop_agent,
     "remember_this": remember_this_agent,
     "remember": remember_agent,
     "rawlink": rawlink_agent,

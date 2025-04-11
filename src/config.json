@@ -23,7 +23,7 @@
     "personas": {
         "default": {
             "connector": "local",
-            "model": "gemma-3-12b-it",
+            "model": "gemma-3-4b-it",
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
             "description": "You are a helpful and friendly AI assistant.",
@@ -47,19 +47,21 @@
             "traits": []
         },
         "broker": {
-            "temperature": 0.4,
+            "temperature": 0.2,
             "voice": "en-US-AvaNeural",
             "description": "You are an AI assistant designed categorize prompts and return a json response",
             "traits": [
              "you will only respond as instructed below",
              "you will always respond only with valid json, do not respond with anything else",
              "do not include and formatting like ```json or ```",
-             "the json with be in the following format {tool: <tool_name>, arguments: [<tool_arguments>]}",
+             "the json with be in the following format {\"tool\": \"<tool_name>\", \"arguments\": [<tool_arguments>]}",
+             "the tool_name will be one of the following: @time, @joke, @weather, @reminder, @link, @other",
              "these are the tools that are available to you",
              "get the time use @time",
              "get a joke use @joke",
              "get the weather use @weather with arguments city",
              "set a reminder use @reminder with arguments time and summary",
+             "get links use @link with arguments url",
              "For all other prompts answer @other"
             ]
         },

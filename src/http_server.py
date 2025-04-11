@@ -36,7 +36,7 @@ def watch_queue():
     while True:
         try:
             # Wait for 2 minutes
-            time.sleep(60)
+            time.sleep(60*5)
             # Check if there is an item in the queue
             if not cleanup_queue.empty():
                 # Get the item from the queue
@@ -177,15 +177,6 @@ def after_request_cleanup(persona, parsed_history, full_response):
 
 @app.route('/query', methods=['POST'])
 def query():
-    def getAnAgent(query: str) -> str:
-        if not query or not isinstance(query, str):
-            return None
-        agent_mention_pattern = r'^@([a-zA-Z0-9_]+)'
-        agent_mentions = re.findall(agent_mention_pattern, query)
-        if not agent_mentions:
-            return None
-        valid_agents = [get_agent(mention) for mention in agent_mentions]
-        return valid_agents
     
     data = request.get_json()
     def generate_stream():    
@@ -208,10 +199,13 @@ def query():
             else:
                 print(f"Invalid entry in conversation history: {entry}")
 
-        if not getAnAgent(data.get('query', '')) and use_broker:
+        if use_broker:
             message = ask_agent("broker", data.get('query', ''))
             yield system_message("Broker returned: " + message)
             try:
+                if (message.startswith("```json")):
+                    message = message[message.find("{"):]
+                    message = message[:message.rfind("}")+1]
                 json_message = dirtyjson.loads(message)
                 if (not json_message['tool'] == "other") and get_agent(json_message['tool']):
                     tool = json_message.get('tool', '')
@@ -221,26 +215,11 @@ def query():
                             yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
                         elif (result[0] == "result"):
                             data['query'] = result[1]
-                            system_responses.append("Agent rewrote query to " + data['query'])
+                            yield system_message("Agent rewrote query to " + data['query'])
                             parsed_history[-1]['content'] = data['query']
             except Exception as e:
                 yield system_message("Broker did not return anything useful: " + str(e))
             
-        while True:
-            valid_agents = getAnAgent(data.get('query', ''))
-            if not valid_agents:
-                break
-            print(f"Valid agents found in query: {valid_agents}")
-            print("The query is: " + data.get('query', ''))
-            for result in valid_agents[0](re.sub(r'^@[a-zA-Z]+', '', data.get('query', '')), parsed_history):
-                if (result[0] == "message"):
-                    yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
-                elif (result[0] == "result"):
-                    data['query'] = result[1]
-                    system_responses.append("Agent rewrote query to " + data['query'])
-                    parsed_history[-1]['content'] = data['query']
-                    yield "data: {json.dumps({'type': 'system', 'content': 'Rovers resport: '" + result[1] + "})}\n\n"
-
         if data.get('context',''):
             data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
             parsed_history[-1]['content'] = data['query']
