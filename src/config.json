@@ -61,7 +61,7 @@
              "get a joke use @joke",
              "get the weather use @weather with arguments city",
              "set a reminder use @reminder with arguments time and summary",
-             "get links use @link with arguments url",
+             "get links use @link with arguments url (only use this if the user asks for a link specifically)",
              "For all other prompts answer @other"
             ]
         },
