@@ -1,3 +1,4 @@
+import json
 from typing import Callable, Generator
 from call_llm_api import ask_agent
 import re
@@ -143,7 +144,7 @@ def dive_agent(query: str, conversation_history: list[dict]) -> str:
     yield ("message", "Diving into the research documents...")
     yield from rover_agent(query + "\n\n" + "\n".join(urls), conversation_history)
 
-def joke_agent(query: str, conversation_history: list[dict]) -> str:
+def joke_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
     yield ("result", f"@link {query} https://www.skiptomylou.org/funny-jokes/")
 
 def news_agent(query: str, conversation_history: list[dict]) -> str:
@@ -159,20 +160,20 @@ def broker_agent(query: str, conversation_history: list[dict]) -> str:
         yield ("message", "Broker: " + response)
         yield ("result", response + " " + query)
 
-def time_agent(query: str, conversation_history: list[dict]) -> str:
+def time_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
     timeAndDate = "The time and date is " + datetime.now().strftime("%I:%M %p on %A, %B %d %Y") + "\n\n" 
     yield ("result", context_template(query, timeAndDate, "Time by @time"))
 
-def weather_agent(query: str, conversation_history: list[dict]) -> str:
+def weather_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
     yield ("message", "Getting the latest weather...")
     yield ("result", f"@rawlink {query} https://forecast.weather.gov/MapClick.php?lat=35.2334&lon=-82.7343")
 
-def learn_agent(query: str, conversation_history: list[dict]) -> str:
+def learn_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
     yield ("message", "Learning...")
     result = ask_agent("rover", query + "from wikipedia", should_cache=True)
     yield ("result", f"@link {result}")
 
-def notes_agent(query: str, conversation_history: list[dict]) -> str:
+def notes_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
     yield ("message", "Checking notes...")
     config_manager = LocalConfigManager("default")
     notesManager = NotesManager(config_manager)
@@ -189,7 +190,7 @@ def notes_agent(query: str, conversation_history: list[dict]) -> str:
         print("Notes: ", notes)
         yield ("result", notes_template(query, notes))
 
-def remember_this_agent(query: str, conversation_history: list[dict]) -> str:
+def remember_this_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
     yield ("message", "Remembering this...")
     print("Conversation history: ", conversation_history)
     result = [x for x in conversation_history if x["role"] == "assistant"][-1]['content']
@@ -199,19 +200,37 @@ def remember_this_agent(query: str, conversation_history: list[dict]) -> str:
     notesManager.put_note(datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt", result)
     yield ("result", "Just say: " + result)
 
-def remember_agent(query: str, conversation_history: list[dict]) -> str:
+def remember_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
     yield ("message", "Remembering this...")
     config_manager = LocalConfigManager("default")
     notesManager = NotesManager(config_manager)
     notesManager.put_note(datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt", query)
     yield ("result", "Just say you will remember this: " + query)
 
+def reminder_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
+    yield ("message", "Remembering this...")
+    config_manager = LocalConfigManager("default")
+    notesManager = NotesManager(config_manager)
+    reminders = notesManager.get_note("reminders.txt")
+    if reminders:
+       reminders = json.loads(reminders)
+    else:
+        reminders = []
+    reminders.append({
+        "time":arguments[0],
+        "message": arguments[1]
+    })
+    notesManager.put_note("reminders.txt", json.dumps(reminders))
+    yield ("result", "Just say you will remember this: " + query)
+
 
 def get_agent(agent_name: str) -> Callable:
+    if agent_name.startswith("@"):
+        agent_name = agent_name[1:]
     if agent_name in agents:
         return agents[agent_name]
     else:
-        return noop_agent
+        return None
 
 agents = {
     "rover": rover_agent,
@@ -231,4 +250,5 @@ agents = {
     "remember_this": remember_this_agent,
     "remember": remember_agent,
     "rawlink": rawlink_agent,
+    "reminder": reminder_agent,
 }

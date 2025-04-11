@@ -2,7 +2,7 @@ import random
 from flask import Flask, send_from_directory, request, jsonify
 import os
 from NotesManager import NotesManager
-from call_llm_api import call_llm_api, ask_agent
+from call_llm_api import ask_agent
 from config import Config
 import json
 import edge_tts
@@ -19,6 +19,7 @@ import threading
 import queue
 import time
 from LocalConfigManager import LocalConfigManager
+import dirtyjson
 
 app = Flask(__name__)
 
@@ -209,8 +210,21 @@ def query():
 
         if not getAnAgent(data.get('query', '')) and use_broker:
             message = ask_agent("broker", data.get('query', ''))
-            data['query'] = message + " " + data.get('query', '')
-            yield system_message("Broker rewrote query to " + data['query'])
+            yield system_message("Broker returned: " + message)
+            try:
+                json_message = dirtyjson.loads(message)
+                if (not json_message['tool'] == "other") and get_agent(json_message['tool']):
+                    tool = json_message.get('tool', '')
+                    arguments = json_message.get('arguments', [])
+                    for result in get_agent(tool)(data.get('query', ''), parsed_history, arguments):
+                        if (result[0] == "message"):
+                            yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
+                        elif (result[0] == "result"):
+                            data['query'] = result[1]
+                            system_responses.append("Agent rewrote query to " + data['query'])
+                            parsed_history[-1]['content'] = data['query']
+            except Exception as e:
+                yield system_message("Broker did not return anything useful: " + str(e))
             
         while True:
             valid_agents = getAnAgent(data.get('query', ''))

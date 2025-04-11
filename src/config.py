@@ -111,7 +111,7 @@ class Config:
         """Get the LMStudio API key from config."""
         if self._get_persona_config(persona).get('connector'):
             connector = self.config['connectors'][self._get_persona_config(persona).get('connector')]
-            return connector['api_key']
+            return connector.get('api_key', None)
         else:
             return None 
         
