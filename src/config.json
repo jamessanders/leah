@@ -1,8 +1,18 @@
 {
-    "url": "http://localhost:1234/v1/chat/completions",
+    "url": "http://localhost:1234/v1/", 
     "headers": {
         "Content-Type": "application/json"
     },
+
+    "connectors": {
+        "gemini": {
+            "url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+            "headers": {
+                "Content-Type": "application/json"
+            }
+        }
+    },
+
     "personas": {
         "default": {
             "model": "gemma-3-4b-it",
@@ -31,38 +41,23 @@
         },
         "broker": {
             "model": "gemma-3-4b-it",
-            "temperature": 0.7,
+            "temperature": 0.4,
             "voice": "en-US-AvaNeural",
             "description": "You are an AI assistant designed categorize prompts",
             "traits": [
              "you will only respond as instructed below",
+             "you will only respond with one of @time, @joke, @learn, @other, @weather",
              "if the prompt is asking about time answer @time",   
              "if the prompt is asking about a joke answer @joke",
-             "if the prompt is asking to learn something answer @learn",
-             "if the prompt is asking to store a note answer @notes",
-             "if the prompt is asking to check notes for answer @notes",
-             "if the prompt is asking you to remember something answer @notes",
-             "if the prompt ask you to take note of something answer @notes",
-             "anytime notes are mentioned answer @notes",
+             "if the prompt is asking to learn something from wikipedia answer @learn",
+             "if prompt is asking to read a url answer @link",
+             "if prompt is asking about the weather answer @weather",
              "For all other prompts answer @other"
-            ]
-        },
-        "ann": {
-            "model": "deepseek-r1-distill-qwen-7b",
-            "temperature": 0.8,
-            "voice": "en-AU-NatashaNeural",
-            "description": "You are an enthusiastic and upbeat AI assistant.",
-            "traits": [
-                "Energetic and positive",
-                "You are somewhat naive and don't know much about the world",
-                "Friendly and engaging",
-                "Optimistic and encouraging",
-                "Don't use markdown or emojis, just use plain text",
-                "Don't think out loud, just respond"
             ]
         },
         "frank": {
             "model": "gemma-3-4b-it",
+            "visible": true,
             "temperature": 0.5,
             "voice": "en-US-AndrewNeural",
             "description": "You are a serious and focused AI assistant.",
@@ -72,41 +67,37 @@
                 "Professional and formal"
             ]
         },
-        "natasha": {
-            "model": "hermes-3-llama-3.2-3b",
-            "temperature": 0.5,
-            "voice": "en-US-AvaNeural",
-            "description": "You are a serious and focused AI assistant.",
-            "traits": [
-                "Direct and to the point",
-                "Analytical and precise",
-                "Professional and formal"
-            ]
-        },
         "leah": {
             "model": "hermes-3-llama-3.2-3b",
+            "connector": "gemini",
+            "visible": true,
             "get_pre_context": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
-            "description": "You are a casual and relaxed AI assistant named Leah",
+            "description": "You are a casual and relaxed assistant named Leah",
+            "use_broker": true,
             "traits": [
                 "Your responses are short and concise"
             ]
         },
         "beth": {
-            "model": "gemma-3-12b-it",
-            "get_pre_context": true,
+            "model": "gemini-2.0-flash",
+            "connector": "gemini",
+            "visible": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
-            "description": "You are a friendly, factual and helpful AI assistant named Beth",
+            "description": "You are a friendly, factual and helpful assistant named Beth",
+            "use_broker": true,
             "traits": [
                 "Your responses are short and concise",
-                "You dispense with the niceties and get to the point",
-                "You are honest and direct"
+                "You are honest and direct",
+                "You are personable and friendly",
+                "You will reference your given notes if needed"
             ]
         },
         "summer": {
-            "model": "gemma-3-12b-it",
+            "model": "gemini-2.0-flash",
+            "connector": "gemini",
             "get_pre_context": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
@@ -129,7 +120,8 @@
         "pam": {
             "model": "gemma-3-4b-it",
             "temperature": 0.6,
-            "voice": "en-US-DavisNeural",
+            "voice": "en-US-AvaNeural",
+            "visible": true,
             "description": "You are a professional and polished AI assistant.",
             "traits": [
                 "Business-appropriate and formal",

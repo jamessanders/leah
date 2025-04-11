@@ -1,3 +1,4 @@
+import random
 from flask import Flask, send_from_directory, request, jsonify
 import os
 from NotesManager import NotesManager
@@ -33,7 +34,7 @@ def watch_queue():
     while True:
         try:
             # Wait for 2 minutes
-            time.sleep(180)
+            time.sleep(60)
             # Check if there is an item in the queue
             if not cleanup_queue.empty():
                 # Get the item from the queue
@@ -67,11 +68,34 @@ def serve_file(filename):
 
 # Function to strip markdown
 def strip_markdown(text):
-    # Remove markdown links
-    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
-    # Remove other markdown syntax
-    text = re.sub(r'[_*`]', '', text)
-    return text
+    """Remove markdown formatting from text."""
+    # Remove code blocks
+    text = re.sub(r'```[\s\S]*?```', '', text)
+    # Remove inline code
+    text = re.sub(r'`[^`]*`', '', text)
+    # Remove bold and italic
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
+    text = re.sub(r'__([^_]+)__', r'\1', text)
+    text = re.sub(r'_([^_]+)_', r'\1', text)
+    return text.strip()
+
+def filter_emojis(text: str) -> str:
+    """Remove emojis from text."""
+    emoji_pattern = re.compile("["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+        u"\U00002702-\U000027B0"
+        u"\U000024C2-\U0001F251"
+        "]+", flags=re.UNICODE)
+    return emoji_pattern.sub('', text)
+
+def filter_urls(text: str) -> str:
+    """Replace URLs with a placeholder text."""
+    url_pattern = r'https?://\S+'
+    return re.sub(url_pattern, 'URL', text)
 
 def check_for_urls(message: str) -> tuple[bool, str]:
     """
@@ -106,8 +130,12 @@ Here is the query:
 Answer the query based on the context.
 """
 
-def generate_voice_file(plain_text_content, voice, voice_dir, timestamp):
+def generate_voice_file(plain_text_content, voice, voice_dir):
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S"+str(random.randint(0, 1000000)))
     voice_file_path = os.path.join(voice_dir, f'response_{timestamp}.mp3')
+    plain_text_content = strip_markdown(plain_text_content)
+    plain_text_content = filter_emojis(plain_text_content)
+    plain_text_content = filter_urls(plain_text_content)
     async def generate_voice():
         communicate = edge_tts.Communicate(text=plain_text_content, voice=voice)
         await communicate.save(voice_file_path)
@@ -117,6 +145,16 @@ def generate_voice_file(plain_text_content, voice, voice_dir, timestamp):
 def system_message(message: str) -> str:
     json_message = json.dumps({'type': 'system', 'content': message})
     return f"data: {json_message}\n\n"
+
+def memory_template(memories: str) -> str:
+    return f"""
+Previous notes:
+{memories}
+END OF PREVIOUS NOTES
+
+Prompt:
+Create detailed notes about the conversation so and combine them with the previous notes. The reply should be no longer than 1500 words.
+"""
 
 def after_request_cleanup(persona, parsed_history, full_response):
     # Add any cleanup or logging logic here
@@ -128,15 +166,14 @@ def after_request_cleanup(persona, parsed_history, full_response):
     memories = notesManager.get_note(f"memories_{persona}.txt")
     parsed_history.append({"role": "assistant", "content": full_response})
     parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
-    prompt = "Previous notes: " + memories + "\n\nEND OF PREVIOUS NOTES\n\nPrompt:Create detailed notes about the conversation be sure to include all the details about the user and the conversation topics, don't ask any follow up questions or start with a greeting. Include all the details from your previous notes as well. The notes should be no longer than 400 words."
-    result = ask_agent(persona, prompt, conversation_history=parsed_history)
-    #result = ask_agent(persona, "Context: " + memories + "\n\n" + result + "\n\n" + "Summarize the the context in detail as an inner monologue recounting every detail about the user topics discussed and your relationship to them, don't ask any follow up questions or start with a greeting. Do not remove any information from the context just reduce it to a more concise form.")
+    prompt = memory_template(memories)
+    persona_override = {"system_content": "You are a rigorous and detailed note taker that can remember things."}
+    result = ask_agent(persona, prompt, conversation_history=parsed_history, persona_override=persona_override)
     notesManager.put_note(f"memories_{persona}.txt", result)
     
 
 @app.route('/query', methods=['POST'])
 def query():
-    use_broker = False
     def getAnAgent(query: str) -> str:
         if not query or not isinstance(query, str):
             return None
@@ -154,7 +191,7 @@ def query():
         persona = data.get('persona', 'leah')
         # Assuming config is available in this context
         config = Config()
-        
+        use_broker = config.get_use_broker(persona)
         # Extract conversation history from the request
         conversation_history = data.get('history', [])
         print("Conversation history: ", conversation_history)
@@ -169,17 +206,10 @@ def query():
                 print(f"Invalid entry in conversation history: {entry}")
 
         if not getAnAgent(data.get('query', '')) and use_broker:
-            agent = get_agent("broker")   
-            for type, message in agent(data.get('query', ''), parsed_history):
-                if type == "message":
-                    yield system_message(message)
-                elif type == "result":
-                    data['query'] = message
-                    print("Broker rewrote query to " + data['query'])
-                    print(message)
-                    yield system_message("Broker rewrote query to " + data['query'])
-                    break
-
+            message = ask_agent("broker", data.get('query', ''))
+            data['query'] = message + " " + data.get('query', '')
+            yield system_message("Broker rewrote query to " + data['query'])
+            
         while True:
             valid_agents = getAnAgent(data.get('query', ''))
             if not valid_agents:
@@ -207,22 +237,18 @@ def query():
             notesManager = NotesManager()
             memories = notesManager.get_note(f"memories_{persona}.txt")
             if memories:
-                parsed_history.insert(0, {"role": "system", "content": system_content + "\n\n" + "These are your notes from previous conversations: " + memories})
+                print("Memories: ", memories)
+                system_content = system_content + "\n\n" + "These are your notes from previous conversations: " + memories
             else:
-                parsed_history.insert(0, {"role": "system", "content": system_content})
+                print("No memories found")
 
         
-        # Prepare API data with the parsed conversation history
-        api_data = {
-            "model": config.get_model(persona),
-            "temperature": config.get_temperature(persona),
-            "messages": parsed_history,
-            "stream": True
-        }
         
-        print("REAL CALL Calling LLM API with data: ", api_data)
-    
-        response = call_llm_api(api_data, config.get_ollama_url(), config.get_headers())
+        response = ask_agent(persona, 
+                             data.get('query', ''), 
+                             stream=True, 
+                             conversation_history=parsed_history, 
+                             persona_override={"system_content":system_content})
 
         # Send the conversation history at the end of the stream
         history_info = {
@@ -237,27 +263,22 @@ def query():
 
         full_response = ""
         buffered_content = ""
-        for line in response:
-            line = line.decode('utf-8').strip()
-            if line.startswith('data: '):
+        for chunk in response:
                 try:
-                    chunk = json.loads(line[6:])
                     if isinstance(chunk, str):
-                        print("Chunk is a string: ", chunk)
                         continue
-                    if chunk.get('choices') and chunk['choices'][0].get('delta', {}).get('content'):
-                        content = chunk['choices'][0]['delta']['content']
+                    else:
+                        content = chunk.choices[0].delta.content
+                    if content:
                         buffered_content += content
                         full_response += content
                         # Check if the buffered content ends with a sentence-ending punctuation
                         if buffered_content.endswith(('.', '!', '?')) and len(buffered_content) > 256:
                             # Generate voice for the complete sentence
-                            plain_text_content = strip_markdown(buffered_content)
                             voice = config.get_voice(persona)
-                            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
                             voice_dir = os.path.join(WEB_DIR, 'voice')
                             os.makedirs(voice_dir, exist_ok=True)
-                            voice_filename = generate_voice_file(plain_text_content, voice, voice_dir, timestamp)
+                            voice_filename = generate_voice_file(buffered_content, voice, voice_dir)
                             voice_file_info = {
                                 "voice_type": voice,
                                 "filename": voice_filename
@@ -273,10 +294,9 @@ def query():
         if buffered_content:
             plain_text_content = strip_markdown(buffered_content)
             voice = config.get_voice(persona)
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             voice_dir = os.path.join(WEB_DIR, 'voice')
             os.makedirs(voice_dir, exist_ok=True)
-            voice_filename = generate_voice_file(plain_text_content, voice, voice_dir, timestamp)
+            voice_filename = generate_voice_file(plain_text_content, voice, voice_dir)
             voice_file_info = {
                 "voice_type": voice,
                 "filename": voice_filename
@@ -294,11 +314,19 @@ def query():
     # Method to add to the queue
     def add_to_cleanup_queue(persona, parsed_history, full_response):
         # Clear all existing items from the cleanup queue
+        # Remove existing items for this persona from the cleanup queue
+        items = []
         while not cleanup_queue.empty():
             try:
-                cleanup_queue.get_nowait()
+                item = cleanup_queue.get_nowait()
+                if item[0] != persona:  # Keep items for other personas
+                    items.append(item)
             except queue.Empty:
                 break
+        # Put back items we want to keep
+        for item in items:
+            cleanup_queue.put(item)
+
         cleanup_queue.put((persona, parsed_history, full_response))
 
     return app.response_class(generate_stream(), mimetype='text/event-stream')

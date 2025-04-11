@@ -36,6 +36,23 @@ def filter_think_tags(text: str) -> str:
     """Remove text between <think> and </think> tags."""
     return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
 
+def filter_emojis(text: str) -> str:
+    """Remove emojis from text."""
+    emoji_pattern = re.compile("["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+        u"\U00002702-\U000027B0"
+        u"\U000024C2-\U0001F251"
+        "]+", flags=re.UNICODE)
+    return emoji_pattern.sub('', text)
+
+def filter_urls(text: str) -> str:
+    """Replace URLs with a placeholder text."""
+    url_pattern = r'https?://\S+'
+    return re.sub(url_pattern, 'URL', text)
+
 
 # Voice Processing
 async def generate_audio_file(text, voice):
@@ -43,6 +60,10 @@ async def generate_audio_file(text, voice):
     try:
         # Strip asterisks from text
         text = text.replace('*', '')
+        
+        # Filter out emojis and URLs
+        text = filter_emojis(text)
+        text = filter_urls(text)
         
         # Create a temporary file with .mp3 extension
         with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:

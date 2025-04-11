@@ -56,11 +56,15 @@ def rss_agent(query: str, conversation_history: list[dict]) -> str:
     yield("message", "Extracting information from " + str(len(pages)) + " pages")
     for r in pages:
         if sum([len(x.split()) for x in summaries]) > 1500:
-            report = ask_agent("summer", "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.")
+            report = ask_agent("summer", 
+                               "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.", 
+                               should_cache=True)
             summaries = [report]
             yield("message", "Compiled report: " + report)
         try:
-            summary = ask_agent("summer", "Here is some context from {source}: \n\n" + r + f"\n\noutput the main content exactly as it is.  Only use the provided context to answer the query.")
+            summary = ask_agent("summer", 
+                                "Here is some context from {source}: \n\n" + r + f"\n\noutput the main content exactly as it is.  Only use the provided context to answer the query.",
+                                should_cache=True)
             summaries.append(summary)
             yield("message", "Rover summary: " + summary)
         except Exception as e:
@@ -68,11 +72,19 @@ def rss_agent(query: str, conversation_history: list[dict]) -> str:
             continue
     summary = "\n\n".join(summaries)
     yield("message", "Compiling report...")
-    report = ask_agent("summer", "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.")
+    report = ask_agent("summer", 
+                       "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.", 
+                       should_cache=True)
     reportWithLinks = report
     yield("message", "Final Report: " + reportWithLinks)
     query = re.sub(r'https?://\S+', '', query).strip()
     yield ("result", context_template(query, reportWithLinks, "Research documents by @rover"))
+
+def rawlink_agent(query: str, conversation_history: list[dict]) -> str:
+    extract_urls = get_urls(query)
+    contents = [download_and_extract_content(url) for url in extract_urls]
+    contents = "\n".join([c[0] for c in contents if c[2] == 200])
+    yield ("result", context_template(query, contents, " ".join(extract_urls)))
 
 def link_agent(query: str, conversation_history: list[dict]) -> str:
     extract_urls = get_urls(query)
@@ -90,11 +102,15 @@ def link_agent(query: str, conversation_history: list[dict]) -> str:
     yield("message", "Extracting information from " + str(len(pages)) + " pages")
     for r in pages:
         if sum([len(x.split()) for x in summaries]) > 1500:
-            report = ask_agent("summer", "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.")
+            report = ask_agent("summer", 
+                               "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.",
+                               should_cache=True)
             summaries = [report]
             yield("message", "Compiled report: " + report)
         try:
-            summary = ask_agent("summer", "Here is some context from {source}: \n\n" + r + f"\n\noutput the main content exactly as it is.  Only use the provided context to answer the query.")
+            summary = ask_agent("summer", 
+                                "Here is some context from {source}: \n\n" + r + f"\n\noutput the main content exactly as it is.  Only use the provided context to answer the query.",
+                                should_cache=True)
             summaries.append(summary)
             yield("message", "Rover summary: " + summary)
         except Exception as e:
@@ -102,9 +118,12 @@ def link_agent(query: str, conversation_history: list[dict]) -> str:
             continue
     summary = "\n\n".join(summaries)
     yield("message", "Compiling report...")
-    report = ask_agent("summer", "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.")
-    #reportWithLinks = ask_agent("summer", "Here is context: \n\nReport: \n\n" + report + "\n\nLinks: \n\n" + links + f"\n\nInclude the links in the report without changing the report.")
-    reportWithLinks = report
+    report = ask_agent("summer", 
+                       "Here is context: \n\n" + summary + f"\n\nBuild a comprehensive report based on the given context and the query '{query}'.",
+                       should_cache=False)
+    reportWithLinks = ask_agent("summer", 
+                                 "Here is context: \n\nReport: \n\n" + report + "\n\nLinks: \n\n" + links + f"\n\nInclude the links in the report without changing the report.",
+                                 should_cache=True)
     yield("message", "Final Report: " + reportWithLinks)
     # Remove URLs from the query before yielding the result
     query = re.sub(r'https?://\S+', '', query).strip()
@@ -132,7 +151,7 @@ def news_agent(query: str, conversation_history: list[dict]) -> str:
 
 def broker_agent(query: str, conversation_history: list[dict]) -> str:
     yield ("message", "Broker is thinking...")
-    response = ask_agent("broker", query)
+    response = ask_agent("broker", query, should_cache=True)
     if not "@" in response:
         yield ("result", query)
     else:
@@ -145,11 +164,11 @@ def time_agent(query: str, conversation_history: list[dict]) -> str:
 
 def weather_agent(query: str, conversation_history: list[dict]) -> str:
     yield ("message", "Getting the latest weather...")
-    yield ("result", f"@link {query} https://forecast.weather.gov/MapClick.php?lat=35.2334&lon=-82.7343")
+    yield ("result", f"@rawlink {query} https://forecast.weather.gov/MapClick.php?lat=35.2334&lon=-82.7343")
 
 def learn_agent(query: str, conversation_history: list[dict]) -> str:
     yield ("message", "Learning...")
-    result = ask_agent("rover", query + "from wikipedia")
+    result = ask_agent("rover", query + "from wikipedia", should_cache=True)
     yield ("result", f"@link {result}")
 
 def notes_agent(query: str, conversation_history: list[dict]) -> str:
@@ -183,18 +202,6 @@ def remember_agent(query: str, conversation_history: list[dict]) -> str:
     notesManager.put_note(datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt", query)
     yield ("result", "Just say you will remember this: " + query)
 
-def update_long_term_memory_agent(query: str, conversation_history: list[dict]) -> str:
-    yield ("message", "Updating long term memory...")
-    print("Updating long term memory...")
-    notesManager = NotesManager()
-    memories = notesManager.get_note("memories.txt")
-    if not memories:
-        notesManager.put_note("memories.txt", "I am a helpful assistant that can remember things.")
-        memories = notesManager.get_note("memories.txt")
-    result = ask_agent("emily", "summarize the conversation in detail as an inner monologue recounting details about the user and your relationship to them, don't ask any follow up questions or start with a greeting.", conversation_history=conversation_history)
-    print("Result: ", result)
-    notesManager.put_note("memories.txt", result)
-    yield ("message", "Updated memories")
 
 def get_agent(agent_name: str) -> Callable:
     if agent_name in agents:
@@ -219,5 +226,5 @@ agents = {
     ##"todo": noop_agent,
     "remember_this": remember_this_agent,
     "remember": remember_agent,
-    "update_long_term_memory": update_long_term_memory_agent
+    "rawlink": rawlink_agent,
 }

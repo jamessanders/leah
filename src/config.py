@@ -77,8 +77,12 @@ class Config:
     def get_system_content(self, persona='default') -> str:
         """Get the system content based on the specified persona."""
         persona_config = self._get_persona_config(persona)
-        return f"{persona_config['description']}\n" + "\n".join(f"- {trait}" for trait in persona_config['traits']) + "\n- the users current time and date is " + datetime.now().strftime("%I:%M %p on %A, %B %d %Y")
+        return f"{persona_config['description']}\n" + "\n".join(f"- {trait}" for trait in persona_config['traits']) + "\n- the users current time and date is " + datetime.now().strftime("%I:%M %p (%Z) on %A, %B %d %Y")
     
+    def get_use_broker(self, persona='default') -> bool:
+        """Get the use broker setting for the specified persona."""
+        return self._get_persona_config(persona).get('use_broker', False)
+
     def get_model(self, persona='default') -> str:
         """Get the model for the specified persona."""
         return self._get_persona_config(persona)['model']
@@ -95,17 +99,33 @@ class Config:
         """Get the voice for the specified persona."""
         return self._get_persona_config(persona)['voice']
     
-    def get_ollama_url(self) -> str:
+    def get_ollama_url(self, persona='default') -> str:
         """Get the LMStudio API URL from config."""
-        return self.config['url']
+        if self._get_persona_config(persona).get('connector'):
+            connector = self.config['connectors'][self._get_persona_config(persona).get('connector')]
+            return connector['url']
+        else:
+            return self.config['url']
     
+    def get_ollama_api_key(self, persona='default') -> str:
+        """Get the LMStudio API key from config."""
+        if self._get_persona_config(persona).get('connector'):
+            connector = self.config['connectors'][self._get_persona_config(persona).get('connector')]
+            return connector['api_key']
+        else:
+            return None 
+        
     def get_headers(self) -> Dict[str, str]:
         """Get the headers from config."""
         return self.config['headers']
     
     def get_persona_choices(self) -> list:
         """Get the list of available personas."""
-        return list(self.config['personas'].keys()) 
+        visible_personas = []
+        for persona, config in self.config['personas'].items():
+            if config.get('visible', False):  # Default to True if not specified
+                visible_personas.append(persona)
+        return visible_personas
     
     def get_after_response(self, persona='default') -> str:
         """Get the after response for the specified persona."""
