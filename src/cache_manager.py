@@ -4,23 +4,29 @@ import pickle
 from typing import Any, Optional, Union, Dict
 import hashlib
 import time
+from LocalConfigManager import LocalConfigManager
 
 class CacheManager:
     """
     A class to manage a cache directory with get and set methods.
     """
     
-    def __init__(self, cache_dir: str = "src/web/cache", default_expiration: int = 600):
+    def __init__(self, config_manager: Optional[LocalConfigManager] = None, default_expiration: int = 600):
         """
-        Initialize the cache manager with the specified cache directory.
+        Initialize the cache manager with the specified LocalConfigManager.
         
         Args:
-            cache_dir: The directory where cache files will be stored.
+            config_manager: The LocalConfigManager instance to use for path management.
+                           If None, a new instance will be created with "default" as the user ID.
             default_expiration: Default expiration time in seconds (default: 600 seconds / 10 minutes)
         """
-        self.cache_dir = cache_dir
+        if config_manager is None:
+            config_manager = LocalConfigManager("default")
+            
+        self.config_manager = config_manager
+        self.cache_dir = self.config_manager.get_path("cache")
         self.default_expiration = default_expiration
-        self.manifest_path = os.path.join(cache_dir, "manifest.json")
+        self.manifest_path = os.path.join(self.cache_dir, "manifest.json")
         self._ensure_cache_dir_exists()
         self._load_manifest()
     

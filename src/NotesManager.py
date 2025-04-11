@@ -1,10 +1,18 @@
 import os
+from LocalConfigManager import LocalConfigManager
 
 class NotesManager:
-    def __init__(self, notes_directory: str = os.path.expanduser('~/Notes')):
-        self.notes_directory = notes_directory
+    def __init__(self, config_manager: LocalConfigManager):
+        """
+        Initialize the NotesManager with a LocalConfigManager instance.
+        
+        Args:
+            config_manager (LocalConfigManager): The LocalConfigManager instance to use for path management
+        """
+        self.config_manager = config_manager
+        self.notes_directory = self.config_manager.get_path("notes")
         if not os.path.exists(self.notes_directory):
-            os.makedirs(self.notes_directory)
+            os.makedirs(self.notes_directory, exist_ok=True)
 
     def get_note(self, note_name: str) -> str:
         """Retrieve the content of a specific note file."""

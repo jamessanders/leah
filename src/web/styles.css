@@ -222,11 +222,12 @@ p {
     .responseArea {
         padding: 10px;
         box-sizing: border-box;
+        height: calc(94vh - 120px); 
     }
     
     .queryInput {
         padding: 10px;
-        margin-top: -30px; /* Move input box up by 30px on very small screens too */
+        margin-top: 5px; /* Move input box up by 30px on very small screens too */
         width: 90%;
         max-width: 90%;
         margin-left: auto;

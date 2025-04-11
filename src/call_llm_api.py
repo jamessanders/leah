@@ -6,6 +6,7 @@ from config import Config
 from datetime import datetime
 from cache_manager import CacheManager
 from openai import OpenAI
+from LocalConfigManager import LocalConfigManager
 
 def context_template(message: str, context: str, extracted_url: str) -> str:
     now = datetime.now()

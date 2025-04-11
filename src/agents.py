@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 from content_extractor import download_and_extract_content, download_and_extract_links, download_and_extract_rss
 from NotesManager import NotesManager
+from LocalConfigManager import LocalConfigManager
 
 def context_template(message: str, context: str, extracted_url: str) -> str:
     now = datetime.now()
@@ -173,7 +174,8 @@ def learn_agent(query: str, conversation_history: list[dict]) -> str:
 
 def notes_agent(query: str, conversation_history: list[dict]) -> str:
     yield ("message", "Checking notes...")
-    notesManager = NotesManager()
+    config_manager = LocalConfigManager("default")
+    notesManager = NotesManager(config_manager)
     decider = ask_agent("decider", "Query was" + query + "\n\nDid the query ask to store something in notes, take note of something, or remember something?")
     print("Decider when asked should store a note: ", decider)
     if "yes" in decider.lower():
@@ -192,13 +194,15 @@ def remember_this_agent(query: str, conversation_history: list[dict]) -> str:
     print("Conversation history: ", conversation_history)
     result = [x for x in conversation_history if x["role"] == "assistant"][-1]['content']
     print("Result: ", result)
-    notesManager = NotesManager()
+    config_manager = LocalConfigManager("default")
+    notesManager = NotesManager(config_manager)
     notesManager.put_note(datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt", result)
     yield ("result", "Just say: " + result)
 
 def remember_agent(query: str, conversation_history: list[dict]) -> str:
     yield ("message", "Remembering this...")
-    notesManager = NotesManager()
+    config_manager = LocalConfigManager("default")
+    notesManager = NotesManager(config_manager)
     notesManager.put_note(datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt", query)
     yield ("result", "Just say you will remember this: " + query)
 

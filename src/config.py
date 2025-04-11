@@ -26,7 +26,7 @@ class Config:
         
         # Check for user config in home directory
         home_dir = os.path.expanduser("~")
-        user_config_path = os.path.join(home_dir, '.hey.config.json')
+        user_config_path = os.path.join(home_dir, '.leah/config.json')
         
         if os.path.exists(user_config_path):
             print("User config found")

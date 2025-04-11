@@ -18,6 +18,7 @@ from agents import get_agent
 import threading
 import queue
 import time
+from LocalConfigManager import LocalConfigManager
 
 app = Flask(__name__)
 
@@ -159,7 +160,8 @@ Create detailed notes about the conversation so and combine them with the previo
 def after_request_cleanup(persona, parsed_history, full_response):
     # Add any cleanup or logging logic here
     print(f"Request has been fully processed for persona: {persona} with history: {parsed_history}")
-    notesManager = NotesManager()
+    config_manager = LocalConfigManager("default")
+    notesManager = NotesManager(config_manager)
     memories = notesManager.get_note(f"memories_{persona}.txt")
     if not memories:
         notesManager.put_note(f"memories_{persona}.txt", "I am a helpful assistant that can remember things.")
@@ -234,7 +236,8 @@ def query():
         # Prepend persona's system content to the beginning of parsed history
         system_content = config.get_system_content(persona)
         if system_content:
-            notesManager = NotesManager()
+            config_manager = LocalConfigManager("default")
+            notesManager = NotesManager(config_manager)
             memories = notesManager.get_note(f"memories_{persona}.txt")
             if memories:
                 print("Memories: ", memories)
