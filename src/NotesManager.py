@@ -1,8 +1,7 @@
 import os
-from LocalConfigManager import LocalConfigManager
 
 class NotesManager:
-    def __init__(self, config_manager: LocalConfigManager):
+    def __init__(self, config_manager):
         """
         Initialize the NotesManager with a LocalConfigManager instance.
         

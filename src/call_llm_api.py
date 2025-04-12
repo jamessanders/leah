@@ -23,7 +23,12 @@ Here is the query:
 Answer the query based on the context.
 """
 
-def ask_agent(persona: str, query: str, stream: bool = False, conversation_history: list[dict] = [], should_cache: bool = False, persona_override: dict = {}) -> str:
+def ask_agent(persona: str, 
+              query: str, 
+              stream: bool = False, 
+              conversation_history: list[dict] = [], 
+              should_cache: bool = False, 
+              persona_override: dict = {}) -> str:
     config = Config()
     model = persona_override.get("model", config.get_model(persona))
     system_content = persona_override.get("system_content", config.get_system_content(persona))
@@ -60,7 +65,7 @@ def ask_agent(persona: str, query: str, stream: bool = False, conversation_histo
         response = call_llm_with_openai(api_data, url, headers, api_key)
     except Exception as e:
         print("Error calling LLM API: ", e)
-        return "An error occurred while calling the LLM API."
+        return "An error occurred while calling the LLM API: " + str(e)
     
     if stream:
         return response

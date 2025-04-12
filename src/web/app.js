@@ -24,9 +24,37 @@ const App = () => {
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [modalInputValue, setModalInputValue] = React.useState('');
     const [submissionQueue, setSubmissionQueue] = React.useState([]);
+    const [isMuted, setIsMuted] = React.useState(false);
+    
+    // Authentication state
+    const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+    const [username, setUsername] = React.useState(() => {
+        return localStorage.getItem('username') || '';
+    });
+    const [token, setToken] = React.useState(() => {
+        return localStorage.getItem('token') || '';
+    });
+    const [loginError, setLoginError] = React.useState('');
+    const [loginLoading, setLoginLoading] = React.useState(false);
+    const [loginForm, setLoginForm] = React.useState({
+        username: '',
+        password: ''
+    });
 
     const userAvatarUrl = 'https://via.placeholder.com/40?text=U'; // Placeholder for user avatar
     const assistantAvatarUrl = `/avatars/avatar-${selectedPersona}.png`;
+
+    // Check authentication status on component mount
+    React.useEffect(() => {
+        const storedUsername = localStorage.getItem('username');
+        const storedToken = localStorage.getItem('token');
+        
+        if (storedUsername && storedToken) {
+            setIsAuthenticated(true);
+            setUsername(storedUsername);
+            setToken(storedToken);
+        }
+    }, []);
 
     // Save state to localStorage whenever it changes
     React.useEffect(() => {
@@ -41,19 +69,97 @@ const App = () => {
         localStorage.setItem('selectedPersona', selectedPersona);
     }, [selectedPersona]);
 
+    // Save authentication data to localStorage
+    React.useEffect(() => {
+        if (username && token) {
+            localStorage.setItem('username', username);
+            localStorage.setItem('token', token);
+        }
+    }, [username, token]);
+
+    // Handle login form input changes
+    const handleLoginInputChange = (e) => {
+        const { name, value } = e.target;
+        setLoginForm(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    // Handle login form submission
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setLoginLoading(true);
+        setLoginError('');
+        
+        try {
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: loginForm.username,
+                    password: loginForm.password
+                }),
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.token) {
+                setUsername(loginForm.username);
+                setToken(data.token);
+                setIsAuthenticated(true);
+                setLoginForm({ username: '', password: '' });
+            } else {
+                setLoginError(data.message || 'Login failed. Please check your credentials.');
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            setLoginError('An error occurred during login. Please try again.');
+        } finally {
+            setLoginLoading(false);
+        }
+    };
+
+    // Handle logout
+    const handleLogout = () => {
+        localStorage.removeItem('username');
+        localStorage.removeItem('token');
+        localStorage.removeItem('conversationHistory');
+        localStorage.removeItem('responses');
+        setIsAuthenticated(false);
+        setUsername('');
+        setToken('');
+        setConversationHistory([]);
+        setResponses([]);
+    };
+
     // Fetch available personas on component mount
     React.useEffect(() => {
         const fetchPersonas = async () => {
+            if (!isAuthenticated) {
+                return;
+            }
             try {
-                const response = await fetch('/personas');
+                const response = await fetch('/personas', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-Username': username
+                    }
+                });
                 const data = await response.json();
-                setPersonas(data);
+                if (!data) {
+                    setPersonas(["leah"]);
+                } else {
+                    setPersonas(data);
+                }
             } catch (error) {
                 console.error('Error fetching personas:', error);
             }
         };
         fetchPersonas();
-    }, []);
+    }, [isAuthenticated, token, username]);
 
     const handlePersonaChange = (event) => {
         setSelectedPersona(event.target.value);
@@ -111,6 +217,8 @@ const App = () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'X-Username': username
                 },
                 body: JSON.stringify({ 
                     query: input, 
@@ -159,8 +267,8 @@ const App = () => {
                                     return [...prevResponses, { role: 'assistant', content: plainTextContent }];
                                 }
                             });
-                        } else if (jsonResponse.voice_type && jsonResponse.filename) {
-                            addToAudioQueue("/voice/" + jsonResponse.filename); // Add to the audio queue
+                        } else if (jsonResponse.voice_type && jsonResponse.filename && !isMuted) {
+                            addToAudioQueue("/voice/" + jsonResponse.filename); // Add to the audio queue only if not muted
                         } else if (jsonResponse.type === "history" && jsonResponse.history) {
                             // Update the conversation history with the server's version
                             setConversationHistory(jsonResponse.history);
@@ -203,6 +311,8 @@ const App = () => {
         // https://github.com/tarasglek/chatcraft.org/pull/357#discussion_r1473470003
         const [queue, setQueue] = React.useState([]);
         const [isPlaying, setIsPlaying] = React.useState(false);
+        const audioContextRef = React.useRef(null);
+        const sourceNodeRef = React.useRef(null);
       
         React.useEffect(() => {
           if (!isPlaying && queue.length > 0) {
@@ -218,24 +328,31 @@ const App = () => {
           }
           setIsPlaying(true);
           const audioUrl = await audioClipUri;
-          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          
+          // Create a new audio context if one doesn't exist
+          if (!audioContextRef.current) {
+            audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          
           try {
               const response = await fetch(audioUrl);
               const arrayBuffer = await response.arrayBuffer();
-              const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-              const source = audioContext.createBufferSource();
+              const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+              const source = audioContextRef.current.createBufferSource();
               source.buffer = audioBuffer;
-              source.connect(audioContext.destination);
+              source.connect(audioContextRef.current.destination);
               source.onended = () => {
                   setQueue((oldQueue) => oldQueue.slice(1));
                   setIsPlaying(false);
-                  audioContext.close();
+                  sourceNodeRef.current = null;
               };
               source.start(0);
+              sourceNodeRef.current = source;
           } catch (error) {
               console.error('Error with Web Audio API playback:', error);
+              setQueue((oldQueue) => oldQueue.slice(1));
               setIsPlaying(false);
-              audioContext.close();
+              sourceNodeRef.current = null;
           }
         };
       
@@ -243,9 +360,31 @@ const App = () => {
           setQueue((oldQueue) => [...oldQueue, audioClipUri]);
         };
       
-        return { addToAudioQueue };
+        const clearAudioQueue = () => {
+          setQueue([]);
+          
+          // Stop currently playing audio if any
+          if (sourceNodeRef.current) {
+            try {
+              sourceNodeRef.current.stop();
+              sourceNodeRef.current = null;
+            } catch (error) {
+              console.error('Error stopping audio:', error);
+            }
+          }
+          
+          // Close the audio context
+          if (audioContextRef.current) {
+            audioContextRef.current.close();
+            audioContextRef.current = null;
+          }
+          
+          setIsPlaying(false);
+        };
+      
+        return { addToAudioQueue, clearAudioQueue };
       };
-      const { addToAudioQueue } = useAudioPlayer()
+      const { addToAudioQueue, clearAudioQueue } = useAudioPlayer();
 
     React.useEffect(() => {
         if (inputRef.current) {
@@ -286,75 +425,148 @@ const App = () => {
         setModalInputValue(event.target.value);
     };
 
+    const handleMuteToggle = () => {
+        setIsMuted(!isMuted);
+        if (!isMuted) {
+            clearAudioQueue();
+        }
+    };
+
     return React.createElement('div', null,
-        React.createElement('div', { className: 'header' },
-            React.createElement('h1', null, ''),
-            React.createElement('select', {
-                className: 'personaSelector',
-                value: selectedPersona,
-                onChange: handlePersonaChange
+        // Show login panel if not authenticated
+        !isAuthenticated ? (
+            React.createElement('div', { 
+                className: 'login-panel'
             },
-                personas.map(persona =>
-                    React.createElement('option', {
-                        key: persona,
-                        value: persona
-                    }, persona.charAt(0).toUpperCase() + persona.slice(1))
+                React.createElement('h2', null, 'Login'),
+                React.createElement('form', { 
+                    onSubmit: handleLogin,
+                    className: 'login-form'
+                },
+                    React.createElement('div', { className: 'form-group' },
+                        React.createElement('label', { htmlFor: 'username' }, 'Username'),
+                        React.createElement('input', {
+                            type: 'text',
+                            id: 'username',
+                            name: 'username',
+                            value: loginForm.username,
+                            onChange: handleLoginInputChange,
+                            required: true
+                        })
+                    ),
+                    React.createElement('div', { className: 'form-group' },
+                        React.createElement('label', { htmlFor: 'password' }, 'Password'),
+                        React.createElement('input', {
+                            type: 'password',
+                            id: 'password',
+                            name: 'password',
+                            value: loginForm.password,
+                            onChange: handleLoginInputChange,
+                            required: true
+                        })
+                    ),
+                    loginError && React.createElement('div', { 
+                        className: 'login-error'
+                    }, loginError),
+                    React.createElement('div', {
+                        onClick: handleLogin,
+                        className: 'login-button',
+                        style: { 
+                            opacity: loginLoading ? 0.7 : 1,
+                            pointerEvents: loginLoading ? 'none' : 'auto'
+                        }
+                    }, loginLoading ? 'Logging in...' : 'Login')
                 )
-            ),
-            React.createElement('div', {
-                onClick: () => {
-                    console.log("Resetting conversation history");
-                    // Clear conversation history when changing personas
-                    setConversationHistory([]);
-                    setResponses([]);
-                    // Clear localStorage for conversation history
-                    localStorage.removeItem('conversationHistory');
-                    localStorage.removeItem('responses');
-                },
-                className: 'resetButton',
-                style: { display: 'inline-block', padding: '10px 20px', fontSize: '16px', cursor: 'pointer', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '5px', marginLeft: '10px' }
-            }, 'Reset'),
-            React.createElement('div', { onClick: handleModalOpen, className: 'open-modal', style: { marginLeft: '10px' } }, 'Context')
-        ),
-        React.createElement('div', { className: 'responseArea', ref: responseAreaRef },
-            responses.map((item, index) =>
-                React.createElement('div', {
-                    key: index,
-                    className: item.role === 'user' ? 'userInputBox' : 'responseBox',
-                    style: { display: 'flex', alignItems: 'flex-start' } // Align items vertically at the start
-                },
-                React.createElement('div', {
-                    className: 'avatar' // Assign class name 'avatar'
-                },
-                item.role === 'assistant' && React.createElement('img', {
-                    src: assistantAvatarUrl,
-                    alt: 'Assistant Avatar'
-                })),
-                React.createElement('div', {
-                    className: 'content', // Assign class name 'content'
-                    dangerouslySetInnerHTML: { __html: item.content }
-                })
-            )),
-            loading && React.createElement('div', { className: 'loadingMessage' }, 'Thinking...')
-        ),
-        React.createElement('input', {
-            type: 'text',
-            value: inputValue,
-            onChange: handleInputChange,
-            onKeyPress: handleKeyPress,
-            onBlur: handleBlur,
-            placeholder: 'Enter your query',
-            className: 'queryInput',
-            ref: inputRef
-        }),
-        isModalOpen && (
-            React.createElement('div', { className: 'modal' },
-                React.createElement('textarea', {
-                    value: modalInputValue,
-                    onChange: handleModalInputChange,
-                    placeholder: 'Enter your context here...'
+            )
+        ) : (
+            React.createElement(React.Fragment, null,
+                React.createElement('div', { className: 'header' },
+                    React.createElement('h1', null, ''),
+                    React.createElement('select', {
+                        className: 'personaSelector',
+                        value: selectedPersona,
+                        onChange: handlePersonaChange
+                    },
+                        personas.map(persona =>
+                            React.createElement('option', {
+                                key: persona,
+                                value: persona
+                            }, persona.charAt(0).toUpperCase() + persona.slice(1))
+                        ) 
+                    ),
+                    React.createElement('div', {
+                        onClick: () => {
+                            console.log("Resetting conversation history");
+                            // Clear conversation history when changing personas
+                            setConversationHistory([]);
+                            setResponses([]);
+                            // Clear localStorage for conversation history
+                            localStorage.removeItem('conversationHistory');
+                            localStorage.removeItem('responses');
+                        },
+                        className: 'resetButton',
+                        style: { display: 'inline-block', padding: '10px 20px', fontSize: '16px', cursor: 'pointer', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '5px', marginLeft: '10px' }
+                    }, 'Reset'),
+                    React.createElement('div', { onClick: handleModalOpen, className: 'open-modal', style: { marginLeft: '10px' } }, 'Context'),
+                    React.createElement('div', { 
+                        onClick: handleMuteToggle, 
+                        className: 'mute-button',
+                        style: { 
+                            marginLeft: '10px', 
+                            cursor: 'pointer', 
+                            padding: '5px 10px', 
+                            backgroundColor: isMuted ? '#dc3545' : '#28a745', 
+                            color: 'white', 
+                            borderRadius: '5px',
+                            display: 'inline-block'
+                        }
+                    }, isMuted ? 'Unmute' : 'Mute'),
+                    React.createElement('div', { 
+                        onClick: handleLogout, 
+                        className: 'logout-button'
+                    }, `X`)
+                ),
+                React.createElement('div', { className: 'responseArea', ref: responseAreaRef },
+                    responses.map((item, index) =>
+                        React.createElement('div', {
+                            key: index,
+                            className: item.role === 'user' ? 'userInputBox' : 'responseBox',
+                            style: { display: 'flex', alignItems: 'flex-start' } // Align items vertically at the start
+                        },
+                        React.createElement('div', {
+                            className: 'avatar' // Assign class name 'avatar'
+                        },
+                        item.role === 'assistant' && React.createElement('img', {
+                            src: assistantAvatarUrl,
+                            alt: 'Assistant Avatar'
+                        })),
+                        React.createElement('div', {
+                            className: 'content', // Assign class name 'content'
+                            dangerouslySetInnerHTML: { __html: item.content }
+                        })
+                    )),
+                    loading && React.createElement('div', { className: 'loadingMessage' }, 'Thinking...')
+                ),
+                React.createElement('input', {
+                    type: 'text',
+                    value: inputValue,
+                    onChange: handleInputChange,
+                    onKeyPress: handleKeyPress,
+                    onBlur: handleBlur,
+                    placeholder: 'Enter your query',
+                    className: 'queryInput',
+                    ref: inputRef
                 }),
-                React.createElement('div', { onClick: handleModalClose, className: 'close-modal', style: { cursor: 'pointer', padding: '10px 20px', backgroundColor: '#007bff', color: '#fff', borderRadius: '5px', display: 'inline-block', textAlign: 'center', marginTop: '10px' } }, 'Close')
+                isModalOpen && (
+                    React.createElement('div', { className: 'modal' },
+                        React.createElement('textarea', {
+                            value: modalInputValue,
+                            onChange: handleModalInputChange,
+                            placeholder: 'Enter your context here...'
+                        }),
+                        React.createElement('div', { onClick: handleModalClose, className: 'close-modal', style: { cursor: 'pointer', padding: '10px 20px', backgroundColor: '#007bff', color: '#fff', borderRadius: '5px', display: 'inline-block', textAlign: 'center', marginTop: '10px' } }, 'Close')
+                    )
+                )
             )
         )
     );

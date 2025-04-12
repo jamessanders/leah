@@ -120,18 +120,26 @@ def weather_agent(query: str, conversation_history: list[dict], arguments: list[
 
 def notes_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
     yield ("message", "Checking notes...")
+    action = arguments[0]
+    note_name = arguments[1]
+    note_content = arguments[2]
     config_manager = LocalConfigManager("default")
     notesManager = NotesManager(config_manager)
-    decider = ask_agent("decider", "Query was" + query + "\n\nDid the query ask to store something in notes, take note of something, or remember something?")
-    print("Decider when asked should store a note: ", decider)
-    if "yes" in decider.lower():
-        note_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt"
-        notesManager.put_note(note_name, ask_agent("emily", "Query was" + query + "\n\nWhat is the note that the user wants to store?"))
+    if action == "update":
+        previous_note_content = notesManager.get_note(note_name)
+        if not previous_note_content:
+            previous_note_content = ""
+        notesManager.put_note(note_name, previous_note_content + "\n" + note_content)
         print("Note stored at " + note_name)
         yield ("message", "Note stored at " + note_name)
-        yield ("result", "Say: Note stored at " + note_name)
+        yield ("result", query)
+    elif action == "delete":
+        ##notesManager.delete_note(note_name)
+        print("Note deleted at " + note_name)
+        yield ("message", "Note deleted at " + note_name)
+        yield ("result", "Say: Note deleted at " + note_name)
     else:
-        notes = notesManager.get_all_notes_content()
+        notes = notesManager.get_note(note_name)
         print("Notes: ", notes)
         yield ("result", notes_template(query, notes))
 
@@ -168,6 +176,22 @@ def reminder_agent(query: str, conversation_history: list[dict], arguments: list
     notesManager.put_note("reminders.txt", json.dumps(reminders))
     yield ("result", "Just say you will remember this: " + query)
 
+def memories_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
+    yield ("message", "Getting memories...")
+    yield ("result", query)
+
+def organize_memories_agent(query: str, conversation_history: list[dict], arguments: list[str]) -> str:
+    yield ("message", "Organizing memories...")
+    config_manager = LocalConfigManager("default")
+    notesManager = NotesManager(config_manager)
+    memories = notesManager.get_note("memories_beth.txt")
+    if memories:
+        result = ask_agent("summer", "Organize the following memories into a structured format and give each section a descriptive filename ending with txt the final output should be json only: \n\n" + memories)
+        print("Result: ", result)
+        yield ("message", result)
+        yield ("result", "Return the result to the user exactly as it is: " + result)
+    else:
+        yield ("result", "No memories found")
 
 def get_agent(agent_name: str) -> Callable:
     if agent_name.startswith("@"):
@@ -190,4 +214,6 @@ agents = {
     "remember": remember_agent,
     "rawlink": rawlink_agent,
     "reminder": reminder_agent,
+    "memories": memories_agent,
+    "organize_memories": organize_memories_agent,
 }

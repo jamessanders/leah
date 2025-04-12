@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+from NotesManager import NotesManager
+from LogManager import LogManager
 
 class LocalConfigManager:
     def __init__(self, user_id: str):
@@ -38,4 +40,22 @@ class LocalConfigManager:
         file_path = self.get_path(filename)
         if not os.path.exists(file_path):
             with open(file_path, 'w') as f:
-                pass  # Create empty file 
+                pass  # Create empty file
+                
+    def get_notes_manager(self) -> NotesManager:
+        """
+        Get a NotesManager instance for managing notes.
+        
+        Returns:
+            NotesManager: A NotesManager instance configured for this user
+        """
+        return NotesManager(self)
+        
+    def get_log_manager(self) -> LogManager:
+        """
+        Get a LogManager instance for managing logs.
+        
+        Returns:
+            LogManager: A LogManager instance configured for this user
+        """
+        return LogManager(self) 

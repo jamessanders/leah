@@ -1,6 +1,7 @@
 import random
-from flask import Flask, send_from_directory, request, jsonify
+from flask import Flask, send_from_directory, request, jsonify, g
 import os
+from LogManager import LogManager
 from NotesManager import NotesManager
 from call_llm_api import ask_agent
 from config import Config
@@ -20,13 +21,60 @@ import queue
 import time
 from LocalConfigManager import LocalConfigManager
 import dirtyjson
+from AuthManager import AuthManager
+from functools import wraps
 
 app = Flask(__name__)
+
+# Create application context
+app_context = app.app_context()
+app_context.push()
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 
 # Initialize mimetypes
 mimetypes.init()
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        
+        # Check if token is in the Authorization header
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+        
+        # If no token in header, check if it's in the request args
+        if not token:
+            token = request.args.get('token')
+            
+        if not token:
+            return jsonify({"error": "Token is missing"}), 401
+            
+        # Get username from request args or headers
+        username = request.args.get('username') or request.headers.get('X-Username')
+        if not username:
+            return jsonify({"error": "Username is required for token validation"}), 401
+            
+        # Validate the token
+        auth_manager = AuthManager()
+        if not auth_manager.verify_token(username, token):
+            return jsonify({"error": "Invalid or expired token"}), 401
+            
+        # Set username on request state
+        g.username = username
+        
+        # Set LocalConfigManager on request state
+        g.config_manager = LocalConfigManager(username)
+            
+        # Token is valid, proceed with the request
+        return f(*args, **kwargs)
+    
+    return decorated
+
+
+
 
 # Create a queue to hold the tuples
 cleanup_queue = queue.Queue()
@@ -36,13 +84,13 @@ def watch_queue():
     while True:
         try:
             # Wait for 2 minutes
-            time.sleep(60*5)
+            time.sleep(60)
             # Check if there is an item in the queue
             if not cleanup_queue.empty():
                 # Get the item from the queue
-                persona, parsed_history, full_response = cleanup_queue.get()
+                username, persona, parsed_history, full_response = cleanup_queue.get()
                 # Process the item
-                after_request_cleanup(persona, parsed_history, full_response)
+                after_request_cleanup(username, persona, parsed_history, full_response)
         except Exception as e:
             print(f"Error in watch_queue: {e}")
 
@@ -132,9 +180,9 @@ Here is the query:
 Answer the query based on the context.
 """
 
-def generate_voice_file(plain_text_content, voice, voice_dir):
+def generate_voice_file(plain_text_content, username, voice, voice_dir):
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S"+str(random.randint(0, 1000000)))
-    voice_file_path = os.path.join(voice_dir, f'response_{timestamp}.mp3')
+    voice_file_path = os.path.join(voice_dir, f'{voice}_{username}_{timestamp}.mp3')
     plain_text_content = strip_markdown(plain_text_content)
     plain_text_content = filter_emojis(plain_text_content)
     plain_text_content = filter_urls(plain_text_content)
@@ -142,7 +190,7 @@ def generate_voice_file(plain_text_content, voice, voice_dir):
         communicate = edge_tts.Communicate(text=plain_text_content, voice=voice)
         await communicate.save(voice_file_path)
     asyncio.run(generate_voice())
-    return f'response_{timestamp}.mp3'
+    return os.path.basename(voice_file_path)
 
 def system_message(message: str) -> str:
     json_message = json.dumps({'type': 'system', 'content': message})
@@ -151,18 +199,28 @@ def system_message(message: str) -> str:
 def memory_template(memories: str) -> str:
     return f"""
 Previous notes:
+
+START OF PREVIOUS NOTES
 {memories}
 END OF PREVIOUS NOTES
 
-Prompt:
-Create detailed notes about the conversation so and combine them with the previous notes. The reply should be no longer than 1500 words.
+Instructions:
+Create detailed notes about the conversation and combine them with the previous notes.
+Make sure to keep a profile of the user and their interests.
+Make sure to keep a profile of your own knowledge, particularily any information about the user.
+Make sure to keep a profile of your self and you relationship with the user.
+Remove duplicate information.
+The final should be a list of instructions for you to follow.
+Use a format that is easy for you to use for reference later.
+The reply should be no longer than 5000 words.
+Don't include any other text than the notes.
 """
 
-def after_request_cleanup(persona, parsed_history, full_response):
+def after_request_cleanup(username, persona, parsed_history, full_response):
     # Add any cleanup or logging logic here
     print(f"Request has been fully processed for persona: {persona} with history: {parsed_history}")
-    config_manager = LocalConfigManager("default")
-    notesManager = NotesManager(config_manager)
+    config_manager = LocalConfigManager(username)
+    notesManager = config_manager.get_notes_manager()
     memories = notesManager.get_note(f"memories_{persona}.txt")
     if not memories:
         notesManager.put_note(f"memories_{persona}.txt", "I am a helpful assistant that can remember things.")
@@ -170,15 +228,20 @@ def after_request_cleanup(persona, parsed_history, full_response):
     parsed_history.append({"role": "assistant", "content": full_response})
     parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
     prompt = memory_template(memories)
-    persona_override = {"system_content": "You are a rigorous and detailed note taker that can remember things."}
+    persona_override = {
+        "system_content": "You are a rigorous and detailed note taker that can remember things."
+    }
     result = ask_agent(persona, prompt, conversation_history=parsed_history, persona_override=persona_override)
     notesManager.put_note(f"memories_{persona}.txt", result)
     
 
 @app.route('/query', methods=['POST'])
+@token_required
 def query():
-    
     data = request.get_json()
+    username = g.username
+    config_manager = LocalConfigManager(g.username)
+    original_query = data.get('query', '')
     def generate_stream():    
         system_responses = []
         # Get the persona from the request, default to 'leah' if not specified
@@ -229,7 +292,6 @@ def query():
         # Prepend persona's system content to the beginning of parsed history
         system_content = config.get_system_content(persona)
         if system_content:
-            config_manager = LocalConfigManager("default")
             notesManager = NotesManager(config_manager)
             memories = notesManager.get_note(f"memories_{persona}.txt")
             if memories:
@@ -274,7 +336,7 @@ def query():
                             voice = config.get_voice(persona)
                             voice_dir = os.path.join(WEB_DIR, 'voice')
                             os.makedirs(voice_dir, exist_ok=True)
-                            voice_filename = generate_voice_file(buffered_content, voice, voice_dir)
+                            voice_filename = generate_voice_file(buffered_content, username, voice, voice_dir)
                             voice_file_info = {
                                 "voice_type": voice,
                                 "filename": voice_filename
@@ -292,7 +354,7 @@ def query():
             voice = config.get_voice(persona)
             voice_dir = os.path.join(WEB_DIR, 'voice')
             os.makedirs(voice_dir, exist_ok=True)
-            voice_filename = generate_voice_file(plain_text_content, voice, voice_dir)
+            voice_filename = generate_voice_file(plain_text_content, username, voice, voice_dir)
             voice_file_info = {
                 "voice_type": voice,
                 "filename": voice_filename
@@ -301,14 +363,17 @@ def query():
 
         yield f"data: {json.dumps({'type': 'end', 'content': 'END OF RESPONSE'})}\n\n"
 
+        log_manager = config_manager.get_log_manager()
+        log_manager.log_chat("user", original_query, persona)
+        log_manager.log_chat("assistant", full_response, persona)
         # Add the current request to the cleanup queue after the response is sent
-        add_to_cleanup_queue(persona, parsed_history, full_response)
+        add_to_cleanup_queue(username, persona, parsed_history, full_response)
 
         after_response = config.get_after_response(persona)
         print("After response: ", after_response)
 
     # Method to add to the queue
-    def add_to_cleanup_queue(persona, parsed_history, full_response):
+    def add_to_cleanup_queue(username, persona, parsed_history, full_response):
         # Clear all existing items from the cleanup queue
         # Remove existing items for this persona from the cleanup queue
         items = []
@@ -323,11 +388,12 @@ def query():
         for item in items:
             cleanup_queue.put(item)
 
-        cleanup_queue.put((persona, parsed_history, full_response))
+        cleanup_queue.put((username, persona, parsed_history, full_response))
 
     return app.response_class(generate_stream(), mimetype='text/event-stream')
 
 @app.route('/personas', methods=['GET'])
+@token_required
 def get_personas():
     config = Config()
     personas = config.get_persona_choices()
@@ -342,6 +408,31 @@ def serve_avatar(requested_avatar):
         return send_from_directory(img_dir, requested_avatar)
     else:
         return send_from_directory(img_dir, default_avatar)
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({"error": "Username and password are required"}), 400
+    
+    username = data.get('username')
+    password = data.get('password')
+    
+    auth_manager = AuthManager()
+    token = auth_manager.authenticate(username, password)
+    
+    if token:
+        return jsonify({"token": token}), 200
+    else:
+        return jsonify({"error": "Invalid username or password"}), 401
+
+@app.route('/protected', methods=['GET'])
+@token_required
+def protected_route():
+    return jsonify({"message": "This is a protected route. You have valid authentication."}), 200
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001) 
