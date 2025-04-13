@@ -44,6 +44,10 @@ const App = () => {
     const userAvatarUrl = 'https://via.placeholder.com/40?text=U'; // Placeholder for user avatar
     const assistantAvatarUrl = `/avatars/avatar-${selectedPersona}.png`;
 
+    // Initialize AudioContext and manage audio streaming
+    const [audioContext, setAudioContext] = React.useState(null);
+    const [isStreaming, setIsStreaming] = React.useState(false);
+
     // Check authentication status on component mount
     React.useEffect(() => {
         const storedUsername = localStorage.getItem('username');
@@ -431,6 +435,72 @@ const App = () => {
             clearAudioQueue();
         }
     };
+
+    React.useEffect(() => {
+        // Create AudioContext on component mount
+        if (!audioContext) {
+            setAudioContext(new (window.AudioContext || window.webkitAudioContext)());
+        }
+        return () => {
+            // Clean up AudioContext on component unmount
+            if (audioContext) {
+                audioContext.close();
+            }
+        };
+    }, [audioContext]);
+
+    const startAudioStream = async () => {
+        if (isStreaming || !audioContext) return; // Prevent multiple streams
+        setIsStreaming(true);
+        try {
+            const response = await fetch('/stream', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'X-Username': username
+                }
+            });
+            const reader = response.body.getReader();
+
+            const playback = async () => {
+                const { done, value } = await reader.read();
+                console.log('Reading audio stream');
+                // Decode and play each chunk as it arrives
+                audioContext.decodeAudioData(value.buffer, (audioBuffer) => {
+                    try{
+                        console.log('Decoded audio data', audioBuffer);
+                        const source = audioContext.createBufferSource();
+                        source.buffer = audioBuffer;
+                        source.connect(audioContext.destination);
+                        source.start();
+                        source.onended = playback;
+                    } catch (error) {
+                        console.error('Error decoding audio:', error);
+                        playback();
+                    }
+                }, (error) => {
+                    console.error('Error decoding audio:', error);
+                    playback();
+                });
+            }
+            playback();
+        } catch (error) {
+            console.error('Error streaming audio:', error);
+            setIsStreaming(false);
+        }
+    };
+
+    // Call startAudioStream when user interacts with the page
+    React.useEffect(() => {
+        const handleUserInteraction = () => {
+            if (!isStreaming) {
+                startAudioStream();
+            }
+        };
+        window.addEventListener('click', handleUserInteraction);
+        return () => {
+            window.removeEventListener('click', handleUserInteraction);
+        };
+    }, [isStreaming, audioContext]);
 
     return React.createElement('div', null,
         // Show login panel if not authenticated

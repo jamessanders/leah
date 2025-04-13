@@ -52,7 +52,6 @@ def ask_agent(persona: str,
         "messages": messages,
         "stream": stream
     }
-    print("Calling LLM API with: ", api_data)
 
     if not stream and should_cache:
         cache = CacheManager()
@@ -71,14 +70,11 @@ def ask_agent(persona: str,
         return response
     else:
         result = response.choices[0].message.content
-        print("Result: ", result)
         if should_cache:
             cache.set(cache_key, result)
         return result
 
 def call_llm_with_openai(data: dict, url: str, headers: dict, api_key = None) -> Any:
-    print("Calling LLM API with (Using OpenAI): ", url, headers)
-    print("DATA: ", data)
     api_key = api_key or "lm-studio"
     client = OpenAI(api_key=api_key, base_url=url)
     return client.chat.completions.create(  
@@ -89,8 +85,6 @@ def call_llm_with_openai(data: dict, url: str, headers: dict, api_key = None) ->
     );
 
 def call_llm_api(data: dict, url: str, headers: dict) -> Any:
-    print("Calling LLM API with: ", url, headers)
-    """Call the LLM API with the given data, URL, and headers, and return the response."""
     # Convert data to JSON string and encode it
     data = json.dumps(data).encode('utf-8')
 

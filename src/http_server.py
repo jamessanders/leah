@@ -23,7 +23,9 @@ from LocalConfigManager import LocalConfigManager
 import dirtyjson
 from AuthManager import AuthManager
 from functools import wraps
-
+from queue import Queue
+import ffmpeg
+    
 app = Flask(__name__)
 
 # Create application context
@@ -64,6 +66,7 @@ def token_required(f):
             
         # Set username on request state
         g.username = username
+        g.token = token
         
         # Set LocalConfigManager on request state
         g.config_manager = LocalConfigManager(username)
@@ -74,17 +77,15 @@ def token_required(f):
     return decorated
 
 
-
-
 # Create a queue to hold the tuples
-cleanup_queue = queue.Queue()
+cleanup_queue = Queue()
 
 # Function to watch the queue and process items
 def watch_queue():
     while True:
         try:
             # Wait for 2 minutes
-            time.sleep(60)
+            time.sleep(60*5)
             # Check if there is an item in the queue
             if not cleanup_queue.empty():
                 # Get the item from the queue
@@ -96,6 +97,27 @@ def watch_queue():
 
 # Start the background thread
 threading.Thread(target=watch_queue, daemon=True).start()
+
+# Create a queue to hold MP3 file paths
+voice_queue = Queue()
+subscribers = {}
+def watch_voice_queue():
+    config = Config()
+    while True:
+        token,username,persona,buffer = voice_queue.get()
+        print(f"Generating voice for persona: {persona} with buffer: {buffer}")
+        voice = config.get_voice(persona)
+        voice_dir = os.path.join(WEB_DIR, 'voice')
+        os.makedirs(voice_dir, exist_ok=True)
+        voice_filename = generate_voice_file(buffer, username, voice, voice_dir)
+        print(f"Voice file generated: {voice_filename}")
+        if token in subscribers:
+            for subscriber in subscribers[token]:
+                subscriber.put(voice_filename)
+        time.sleep(0.1)
+
+# Start the background thread
+threading.Thread(target=watch_voice_queue, daemon=True).start()
 
 @app.route('/')
 def serve_index():
@@ -190,7 +212,7 @@ def generate_voice_file(plain_text_content, username, voice, voice_dir):
         communicate = edge_tts.Communicate(text=plain_text_content, voice=voice)
         await communicate.save(voice_file_path)
     asyncio.run(generate_voice())
-    return os.path.basename(voice_file_path)
+    return voice_file_path
 
 def system_message(message: str) -> str:
     json_message = json.dumps({'type': 'system', 'content': message})
@@ -218,7 +240,6 @@ Don't include any other text than the notes.
 
 def after_request_cleanup(username, persona, parsed_history, full_response):
     # Add any cleanup or logging logic here
-    print(f"Request has been fully processed for persona: {persona} with history: {parsed_history}")
     config_manager = LocalConfigManager(username)
     notesManager = config_manager.get_notes_manager()
     memories = notesManager.get_note(f"memories_{persona}.txt")
@@ -242,6 +263,7 @@ def query():
     username = g.username
     config_manager = LocalConfigManager(g.username)
     original_query = data.get('query', '')
+    token = g.token
     def generate_stream():    
         system_responses = []
         # Get the persona from the request, default to 'leah' if not specified
@@ -251,7 +273,6 @@ def query():
         use_broker = config.get_use_broker(persona)
         # Extract conversation history from the request
         conversation_history = data.get('history', [])
-        print("Conversation history: ", conversation_history)
 
         
         # Parse and validate the conversation history
@@ -295,7 +316,6 @@ def query():
             notesManager = NotesManager(config_manager)
             memories = notesManager.get_note(f"memories_{persona}.txt")
             if memories:
-                print("Memories: ", memories)
                 system_content = system_content + "\n\n" + "These are your notes from previous conversations: " + memories
             else:
                 print("No memories found")
@@ -333,15 +353,7 @@ def query():
                         # Check if the buffered content ends with a sentence-ending punctuation
                         if buffered_content.endswith(('.', '!', '?')) and len(buffered_content) > 256:
                             # Generate voice for the complete sentence
-                            voice = config.get_voice(persona)
-                            voice_dir = os.path.join(WEB_DIR, 'voice')
-                            os.makedirs(voice_dir, exist_ok=True)
-                            voice_filename = generate_voice_file(buffered_content, username, voice, voice_dir)
-                            voice_file_info = {
-                                "voice_type": voice,
-                                "filename": voice_filename
-                            }
-                            yield f"data: {json.dumps(voice_file_info)}\n\n"
+                            voice_queue.put((token, username, persona, buffered_content))
                             # Reset the buffer
                             buffered_content = ""
                         yield f"data: {json.dumps({'content': content})}\n\n"
@@ -349,17 +361,8 @@ def query():
                     print(f"Error decoding JSON: {e}")
 
         # After the loop, check for any remaining buffered content
-        if buffered_content:
-            plain_text_content = strip_markdown(buffered_content)
-            voice = config.get_voice(persona)
-            voice_dir = os.path.join(WEB_DIR, 'voice')
-            os.makedirs(voice_dir, exist_ok=True)
-            voice_filename = generate_voice_file(plain_text_content, username, voice, voice_dir)
-            voice_file_info = {
-                "voice_type": voice,
-                "filename": voice_filename
-            }
-            yield f"data: {json.dumps(voice_file_info)}\n\n"
+        if buffered_content:    
+            voice_queue.put((token, username, persona, buffered_content))
 
         yield f"data: {json.dumps({'type': 'end', 'content': 'END OF RESPONSE'})}\n\n"
 
@@ -368,9 +371,6 @@ def query():
         log_manager.log_chat("assistant", full_response, persona)
         # Add the current request to the cleanup queue after the response is sent
         add_to_cleanup_queue(username, persona, parsed_history, full_response)
-
-        after_response = config.get_after_response(persona)
-        print("After response: ", after_response)
 
     # Method to add to the queue
     def add_to_cleanup_queue(username, persona, parsed_history, full_response):
@@ -432,7 +432,28 @@ def login():
 def protected_route():
     return jsonify({"message": "This is a protected route. You have valid authentication."}), 200
 
+@app.route('/stream', methods=['GET'])
+@token_required
+def stream_mp3():
+    token = g.token
+    if not token in subscribers:
+        subscribers[token] = []
+    queue = Queue()
+    subscribers[token].append(queue)
+    def generate():
+        while True:
+            voice_filename = queue.get()
+            print(f"Streaming voice file: {voice_filename}")
 
+            process = (
+                ffmpeg
+                .input(voice_filename)
+                .output('pipe:', format='ogg')
+                .run_async(pipe_stdout=True, pipe_stderr=True)
+            )
+            out, err = process.communicate()
+            yield out;
+    return app.response_class(generate(), mimetype='audio/mpeg')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001) 
