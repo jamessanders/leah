@@ -64,6 +64,8 @@ def token_required(f):
             
         # Set username on request state
         g.username = username
+        g.token = token
+        g.user_config = auth_manager.get_user_config(username, token)
         
         # Set LocalConfigManager on request state
         g.config_manager = LocalConfigManager(username)
@@ -240,7 +242,6 @@ Don't include any other text than the notes.
 
 def after_request_cleanup(username, persona, parsed_history, full_response):
     # Add any cleanup or logging logic here
-    print(f"Request has been fully processed for persona: {persona} with history: {parsed_history}")
     config_manager = LocalConfigManager(username)
     notesManager = config_manager.get_notes_manager()
     memories = notesManager.get_note(f"memories_{persona}.txt")
@@ -262,6 +263,7 @@ def after_request_cleanup(username, persona, parsed_history, full_response):
 def query():
     data = request.get_json()
     username = g.username
+    user_config = g.user_config
     config_manager = LocalConfigManager(g.username)
     original_query = data.get('query', '')
     def generate_stream():    
@@ -270,10 +272,14 @@ def query():
         persona = data.get('persona', 'leah')
         # Assuming config is available in this context
         config = Config()
+        personas = config.get_persona_choices(user_config.get("groups", ["default"]))
+        if persona not in personas:
+            yield system_message("Persona not found")
+            yield f"data: {json.dumps({'type': 'end', 'content': 'END OF RESPONSE'})}\n\n"
+            return
         use_broker = config.get_use_broker(persona)
         # Extract conversation history from the request
         conversation_history = data.get('history', [])
-        print("Conversation history: ", conversation_history)
 
         
         # Parse and validate the conversation history
@@ -317,7 +323,6 @@ def query():
             notesManager = NotesManager(config_manager)
             memories = notesManager.get_note(f"memories_{persona}.txt")
             if memories:
-                print("Memories: ", memories)
                 system_content = system_content + "\n\n" + "These are your notes from previous conversations: " + memories
             else:
                 print("No memories found")
@@ -391,8 +396,6 @@ def query():
         # Add the current request to the cleanup queue after the response is sent
         add_to_cleanup_queue(username, persona, parsed_history, full_response)
 
-        after_response = config.get_after_response(persona)
-        print("After response: ", after_response)
 
     # Method to add to the queue
     def add_to_cleanup_queue(username, persona, parsed_history, full_response):
@@ -432,7 +435,12 @@ def serve_voice(voice_filename):
 @token_required
 def get_personas():
     config = Config()
-    personas = config.get_persona_choices()
+    user_config = g.user_config
+    if user_config:
+        groups = user_config.get("groups", ["default"])
+    else:
+        groups = ["default"]
+    personas = config.get_persona_choices(groups)
     return jsonify(personas)
 
 @app.route('/avatars/<requested_avatar>')

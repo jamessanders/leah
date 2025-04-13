@@ -24,7 +24,6 @@ const App = () => {
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [modalInputValue, setModalInputValue] = React.useState('');
     const [submissionQueue, setSubmissionQueue] = React.useState([]);
-    const [isMuted, setIsMuted] = React.useState(false);
     
     // Authentication state
     const [isAuthenticated, setIsAuthenticated] = React.useState(false);
@@ -33,6 +32,9 @@ const App = () => {
     });
     const [token, setToken] = React.useState(() => {
         return localStorage.getItem('token') || '';
+    });
+    const [isMuted, setIsMuted] = React.useState(() => {
+        return localStorage.getItem('isMuted') === 'true';
     });
     const [loginError, setLoginError] = React.useState('');
     const [loginLoading, setLoginLoading] = React.useState(false);
@@ -76,6 +78,11 @@ const App = () => {
             localStorage.setItem('token', token);
         }
     }, [username, token]);
+
+    // Save mute state to localStorage whenever it changes
+    React.useEffect(() => {
+        localStorage.setItem('isMuted', isMuted);
+    }, [isMuted]);
 
     // Handle login form input changes
     const handleLoginInputChange = (e) => {
@@ -150,8 +157,11 @@ const App = () => {
                 });
                 const data = await response.json();
                 if (!data) {
-                    setPersonas(["leah"]);
+                    setPersonas(["beth"]);
                 } else {
+                    if (selectedPersona && !data.includes(selectedPersona)) {
+                        setSelectedPersona(data[0]);
+                    }
                     setPersonas(data);
                 }
             } catch (error) {
@@ -509,7 +519,7 @@ React.useEffect(() => {
         ) : (
             React.createElement(React.Fragment, null,
                 React.createElement('div', { className: 'header' },
-                    React.createElement('h1', null, ''),
+                    React.createElement('h1', null, ''),personas.length > 1 ? 
                     React.createElement('select', {
                         className: 'personaSelector',
                         value: selectedPersona,
@@ -521,7 +531,7 @@ React.useEffect(() => {
                                 value: persona
                             }, persona.charAt(0).toUpperCase() + persona.slice(1))
                         ) 
-                    ),
+                    ) : null,
                     React.createElement('div', {
                         onClick: toggleDropdown,
                         className: 'dropdown-button',

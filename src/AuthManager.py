@@ -146,6 +146,21 @@ class AuthManager:
             
         return True
 
+    def get_user_config(self, username: str, token: str) -> Dict[str, Any]:
+        """
+        Get the configuration for a user.
+        
+        Args:
+            username (str): The username to get configuration for
+        """
+        if username not in self.auth_data["users"]:
+            return None
+
+        if token not in self.auth_data["users"][username]["tokens"]:
+            return None
+
+        return self.auth_data["users"][username]["config"]
+
     def update_auth_data(self, new_data: Dict[str, Any]) -> None:
         """
         Update the authentication data and save it to the file.

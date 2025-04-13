@@ -81,6 +81,7 @@
         },
         "frank": {
             "visible": true,
+            "group": "experimental",
             "temperature": 0.5,
             "voice": "en-US-AndrewNeural",
             "description": "You are a serious and focused AI assistant.",
@@ -93,6 +94,7 @@
         "leah": {
             "model": "hermes-3-llama-3.2-3b",
             "visible": true,
+            "group": "experimental",
             "get_pre_context": true,
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
@@ -106,6 +108,7 @@
             "model": "gpt-4o-mini",
             "connector": "chatgpt",
             "visible": true,
+            "group": "stable",
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
             "description": "You are a friendly, factual and helpful assistant named Ellie",
@@ -123,6 +126,7 @@
             "model": "gemini-2.0-flash",
             "connector": "gemini",
             "visible": true,
+            "group": "stable,default",
             "temperature": 0.7,
             "voice": "en-US-AvaNeural",
             "description": "You are a friendly, factual and helpful assistant named Beth",
@@ -159,6 +163,7 @@
             "temperature": 0.6,
             "voice": "en-US-AvaNeural",
             "visible": true,
+            "group": "experimental",
             "description": "You are a professional and polished AI assistant.",
             "traits": [
                 "Business-appropriate and formal",

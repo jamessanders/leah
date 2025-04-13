@@ -119,11 +119,11 @@ class Config:
         """Get the headers from config."""
         return self.config['headers']
     
-    def get_persona_choices(self) -> list:
+    def get_persona_choices(self, groups: list[str]) -> list:
         """Get the list of available personas."""
         visible_personas = []
         for persona, config in self.config['personas'].items():
-            if config.get('visible', False):  # Default to True if not specified
+            if config.get('visible', False) and any(group in groups for group in config.get('group', "").split(",")):
                 visible_personas.append(persona)
         return visible_personas
     
