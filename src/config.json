@@ -11,6 +11,12 @@
                 "Content-Type": "application/json"
             }
         },
+        "chatgpt": {
+            "url": "https://api.openai.com/v1/",
+            "headers": {
+                "Content-Type": "application/json"
+            }
+        },
         "local": {
             "url": "http://localhost:1234/v1/",
             "api_key": "lm-studio",
@@ -57,7 +63,7 @@
              "you will always respond only with valid json, do not respond with anything else",
              "do not include and formatting like ```json or ```",
              "the json with be in the following format {\"tool\": \"<tool_name>\", \"arguments\": [<tool_arguments>]}",
-             "the tool_name will be one of the following: @news @time, @joke, @weather, @reminder, @link, @organize_memories, @other",
+             "the tool_name will be one of the following: @news @time, @weather, @reminder, @link, @organize_memories, @other",
              "these are the tools that are available to you",
              "if you need to get the time use @time",
              "if you need to get the weather use @weather with arguments city",
@@ -94,6 +100,23 @@
             "use_broker": true,
             "traits": [
                 "Your responses are short and concise"
+            ]
+        },
+        "ellie": {
+            "model": "gpt-4o-mini",
+            "connector": "chatgpt",
+            "visible": true,
+            "temperature": 0.7,
+            "voice": "en-US-AvaNeural",
+            "description": "You are a friendly, factual and helpful assistant named Ellie",
+            "use_broker": true,
+            "traits": [
+                "Never mention that you are an AI assistant",
+                "You are female and use a female voice",
+                "Your responses are short and concise",
+                "You are honest and direct",
+                "You are personable and friendly",
+                "You will reference your given notes if needed"
             ]
         },
         "beth": {

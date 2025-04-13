@@ -97,6 +97,28 @@ def watch_queue():
 # Start the background thread
 threading.Thread(target=watch_queue, daemon=True).start()
 
+voice_files = {}
+voice_queue = queue.Queue()
+
+def voice_generator():
+    while True:
+        try:
+            time.sleep(1)
+            while not voice_queue.empty():
+                voice_filename, plain_text_content, voice = voice_queue.get()
+                voice_dir = os.path.join(WEB_DIR, 'voice')
+                voice_file_path = os.path.join(voice_dir, voice_filename)
+                if not os.path.exists(voice_file_path):
+                   print(f"Generating voice for {voice_filename} as {voice_file_path}")
+                   async def generate_voice():
+                     communicate = edge_tts.Communicate(text=plain_text_content, voice=voice)
+                     await communicate.save(voice_file_path)
+                   asyncio.run(generate_voice())
+                   del voice_files[voice_filename]         
+        except Exception as e:
+            print(f"Error in voice_generator: {e}")
+threading.Thread(target=voice_generator, daemon=True).start()
+
 @app.route('/')
 def serve_index():
     return send_from_directory(WEB_DIR, 'index.html')
@@ -180,17 +202,17 @@ Here is the query:
 Answer the query based on the context.
 """
 
+
 def generate_voice_file(plain_text_content, username, voice, voice_dir):
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S"+str(random.randint(0, 1000000)))
     voice_file_path = os.path.join(voice_dir, f'{voice}_{username}_{timestamp}.mp3')
     plain_text_content = strip_markdown(plain_text_content)
     plain_text_content = filter_emojis(plain_text_content)
     plain_text_content = filter_urls(plain_text_content)
-    async def generate_voice():
-        communicate = edge_tts.Communicate(text=plain_text_content, voice=voice)
-        await communicate.save(voice_file_path)
-    asyncio.run(generate_voice())
-    return os.path.basename(voice_file_path)
+    filename = os.path.basename(voice_file_path)
+    voice_files[filename] = (plain_text_content, voice)
+    voice_queue.put((filename, plain_text_content, voice))
+    return filename
 
 def system_message(message: str) -> str:
     json_message = json.dumps({'type': 'system', 'content': message})
@@ -391,6 +413,20 @@ def query():
         cleanup_queue.put((username, persona, parsed_history, full_response))
 
     return app.response_class(generate_stream(), mimetype='text/event-stream')
+
+@app.route('/voice/<voice_filename>')
+def serve_voice(voice_filename):
+    voice_dir = os.path.join(WEB_DIR, 'voice')
+    voice_file_path = os.path.join(voice_dir, voice_filename)
+    if not os.path.exists(voice_file_path):
+        plain_text_content, voice = voice_files[voice_filename]
+        print(f"Just in time Generating voice for {voice_filename} as {voice_file_path}")
+        async def generate_voice():
+            communicate = edge_tts.Communicate(text=plain_text_content, voice=voice)
+            await communicate.save(voice_file_path)
+        asyncio.run(generate_voice())
+        del voice_files[voice_filename]
+    return send_from_directory(voice_dir, voice_filename)
 
 @app.route('/personas', methods=['GET'])
 @token_required

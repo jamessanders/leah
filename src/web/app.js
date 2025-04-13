@@ -432,6 +432,34 @@ const App = () => {
         }
     };
 
+    const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+
+    const panelRef = React.useRef(null);
+
+    // Close the panel if clicked outside
+    const handleClickOutside = (event) => {
+        if (panelRef.current && !panelRef.current.contains(event.target)) {
+                setIsDropdownOpen(false);
+        }
+    };
+
+// Add event listener for clicks outside the panel
+React.useEffect(() => {
+    if (isDropdownOpen) {
+        document.addEventListener('mousedown', handleClickOutside);
+    } else {
+        document.removeEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+    };
+}, [isDropdownOpen]);
+
+    const toggleDropdown = () => {
+        setIsDropdownOpen(prev => !prev);
+    };
+
     return React.createElement('div', null,
         // Show login panel if not authenticated
         !isAuthenticated ? (
@@ -495,36 +523,30 @@ const App = () => {
                         ) 
                     ),
                     React.createElement('div', {
-                        onClick: () => {
-                            console.log("Resetting conversation history");
-                            // Clear conversation history when changing personas
-                            setConversationHistory([]);
-                            setResponses([]);
-                            // Clear localStorage for conversation history
-                            localStorage.removeItem('conversationHistory');
-                            localStorage.removeItem('responses');
-                        },
-                        className: 'resetButton',
-                        style: { display: 'inline-block', padding: '10px 20px', fontSize: '16px', cursor: 'pointer', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '5px', marginLeft: '10px' }
-                    }, 'Reset'),
-                    React.createElement('div', { onClick: handleModalOpen, className: 'open-modal', style: { marginLeft: '10px' } }, 'Context'),
-                    React.createElement('div', { 
-                        onClick: handleMuteToggle, 
-                        className: 'mute-button',
-                        style: { 
-                            marginLeft: '10px', 
-                            cursor: 'pointer', 
-                            padding: '5px 10px', 
-                            backgroundColor: isMuted ? '#dc3545' : '#28a745', 
-                            color: 'white', 
-                            borderRadius: '5px',
-                            display: 'inline-block'
-                        }
-                    }, isMuted ? 'Unmute' : 'Mute'),
-                    React.createElement('div', { 
-                        onClick: handleLogout, 
-                        className: 'logout-button'
-                    }, `X`)
+                        onClick: toggleDropdown,
+                        className: 'dropdown-button',
+                    }, 'Menu'),
+                    React.createElement('div', { className: isDropdownOpen ? 'dropdown-menu' : 'dropdown-menu hidden', ref: panelRef },
+                        React.createElement('div', {
+                            onClick: () => {
+                                console.log("Resetting conversation history");
+                                setConversationHistory([]);
+                                setResponses([]);
+                                localStorage.removeItem('conversationHistory');
+                                localStorage.removeItem('responses');
+                            },
+                            className: 'dropdown-item'
+                        }, 'Reset'),
+                        React.createElement('div', { onClick: handleModalOpen, className: 'dropdown-item' }, 'Context'),
+                        React.createElement('div', { 
+                            onClick: handleMuteToggle, 
+                            className: 'dropdown-item'
+                        }, isMuted ? 'Unmute' : 'Mute'),
+                        React.createElement('div', { 
+                            onClick: handleLogout, 
+                            className: 'dropdown-item'
+                        }, 'Logout')
+                    )
                 ),
                 React.createElement('div', { className: 'responseArea', ref: responseAreaRef },
                     responses.map((item, index) =>
