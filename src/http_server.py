@@ -246,9 +246,9 @@ def after_request_cleanup(username, persona, parsed_history, full_response):
     # Add any cleanup or logging logic here
     config_manager = LocalConfigManager(username)
     notesManager = config_manager.get_notes_manager()
-    memories = notesManager.get_note(f"memories_{persona}.txt")
+    memories = notesManager.get_note(f"memories/memories_{persona}.txt")
     if not memories:
-        notesManager.put_note(f"memories_{persona}.txt", "I am a helpful assistant that can remember things.")
+        notesManager.put_note(f"memories/memories_{persona}.txt", "I am a helpful assistant that can remember things.")
     memories = notesManager.get_note(f"memories_{persona}.txt")
     parsed_history.append({"role": "assistant", "content": full_response})
     parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
@@ -257,7 +257,7 @@ def after_request_cleanup(username, persona, parsed_history, full_response):
         "system_content": "You are a rigorous and detailed note taker that can remember things."
     }
     result = ask_agent(persona, prompt, conversation_history=parsed_history, persona_override=persona_override)
-    notesManager.put_note(f"memories_{persona}.txt", result)
+    notesManager.put_note(f"memories/memories_{persona}.txt", result)
     
 
 @app.route('/query', methods=['POST'])
@@ -291,9 +291,9 @@ def query():
                 print(f"Invalid entry in conversation history: {entry}")
 
         notesManager = config_manager.get_notes_manager()
-        memories = notesManager.get_note(f"memories_{persona}.txt")
+        memories = notesManager.get_note(f"memories/memories_{persona}.txt")
         if memories:
-            memories = "These are your notes from previous conversations: " + memories
+            memories = "These are your memories from previous conversations: " + memories
         else:
             memories = "You are a helpful assistant that can remember things."
 
@@ -308,19 +308,17 @@ def query():
             parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
             
             system_content = config.get_system_content(persona)
+            if not system_content:
+                system_content = ""
+            # Prepend persona's system content to the beginning of parsed history
+            
+            if memories:
+                system_content = system_content + "\n\n" + memories
             if use_broker:
                 actions = Actions.Actions(config_manager, persona, data.get('query', ''), conversation_history)
                 actions_prompt = actions.get_actions_prompt()
                 system_content = system_content + "\n\n" + actions_prompt
             
-            
-            # Prepend persona's system content to the beginning of parsed history
-            
-            if system_content:
-                if memories:
-                    system_content = system_content + "\n\n" + "These are your notes from previous conversations: \n\n" + memories
-                else:
-                    print("No memories found")
 
             response = ask_agent(persona, 
                                 data.get('query', ''), 
@@ -365,7 +363,7 @@ def query():
                     except json.JSONDecodeError as e:
                         print(f"Error decoding JSON: {e}")
 
-            if not full_response.startswith("@"):
+            if not "@FETCH" in full_response:
                 # After the loop, check for any remaining buffered content
                 if buffered_content:
                     plain_text_content = strip_markdown(buffered_content)
@@ -382,7 +380,9 @@ def query():
             else:
                 try:
                     print("Full response we should parse: " + full_response)
+                    parsed_response = full_response[full_response.find("@FETCH"):].strip()
                     parsed_response = full_response.replace("@FETCH ", "").split(" ");
+                    print("Parsed response: " + str(parsed_response))
                     tool_name = parsed_response[0]
                     tool_arguments = json.loads(" ".join(parsed_response[1:]))
                     print("Tool name: " + tool_name)
@@ -395,6 +395,8 @@ def query():
                         elif type == "result":
                             parsed_history = parsed_history[:-1]
                         parsed_history.append({"role": "user", "content": message})
+                        data['query'] = message
+                        print("Parsed history: " + str(parsed_history))
                         yield system_message("Query rewritten: " + message)
                 except Exception as e:
                     print("Error parsing full response: " + str(e))

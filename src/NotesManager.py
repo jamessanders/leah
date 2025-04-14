@@ -16,9 +16,16 @@ class NotesManager:
         self.backup_directory = os.path.join(self.notes_directory, "backup")
         if not os.path.exists(self.backup_directory):
             os.makedirs(self.backup_directory, exist_ok=True)
+        self.memories_directory = os.path.join(self.notes_directory, "memories")
+        if not os.path.exists(self.memories_directory):
+            os.makedirs(self.memories_directory, exist_ok=True)
+        if not os.path.exists(os.path.join(self.backup_directory, "memories")):
+            os.makedirs(os.path.join(self.backup_directory, "memories"), exist_ok=True)
 
     def get_note(self, note_name: str) -> str:
         """Retrieve the content of a specific note file."""
+        if not note_name.endswith(".txt"):
+            note_name += ".txt"
         note_path = os.path.join(self.notes_directory, note_name)
         if os.path.exists(note_path):
             with open(note_path, 'r', encoding='utf-8') as file:
@@ -29,6 +36,8 @@ class NotesManager:
     def put_note(self, note_name: str, content: str) -> None:
         """Store content into a specific note file."""
         # Check if note exists and create backup if it does
+        if not note_name.endswith(".txt"):
+            note_name += ".txt"
         note_path = os.path.join(self.notes_directory, note_name)
         if os.path.exists(note_path):
             from datetime import datetime
@@ -40,6 +49,10 @@ class NotesManager:
         note_path = os.path.join(self.notes_directory, note_name)
         with open(note_path, 'w', encoding='utf-8') as file:
             file.write(content)
+
+    def get_all_notes(self) -> list[str]:
+        """Retrieve the names of all note files."""
+        return [note_name for note_name in os.listdir(self.notes_directory) if note_name.endswith(".txt")]
 
     def get_all_notes_content(self) -> str:
         """Retrieve the content of all note files and output them as a single string."""
