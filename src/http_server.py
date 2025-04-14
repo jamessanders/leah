@@ -300,6 +300,8 @@ def query():
         call_count = 0
         while call_count < 3:  
             call_count += 1
+            buffer_mode = False
+            check_buffer = ""
             if data.get('context',''):
                 data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
                 parsed_history[-1]['content'] = data['query']
@@ -344,8 +346,21 @@ def query():
                         if content:
                             buffered_content += content
                             full_response += content
-                            # Check if the buffered content ends with a sentence-ending punctuation
-                            if not full_response.startswith("@"):
+                            print("Content: " + content)
+                            if not buffer_mode and content.startswith("@"):
+                                buffer_mode = True
+                                check_buffer = ""
+                            if buffer_mode:
+                                check_buffer = check_buffer + content
+                                if len(check_buffer) >= 7 and not check_buffer.startswith("@FETCH"):
+                                    buffer_mode = False
+                                    yield f"data: {json.dumps({'content': check_buffer})}\n\n"
+                                    check_buffer = ""
+                                    continue
+                                else:
+                                    print("Check buffer: " + check_buffer)
+                                    continue
+                            else:
                                 if buffered_content.endswith(('.', '!', '?')) and len(buffered_content) > 256:
                                     # Generate voice for the complete sentence
                                     voice = config.get_voice(persona)
@@ -363,6 +378,7 @@ def query():
                     except json.JSONDecodeError as e:
                         print(f"Error decoding JSON: {e}")
 
+            print("Check buffer: " + check_buffer)
             if not "@FETCH" in full_response:
                 # After the loop, check for any remaining buffered content
                 if buffered_content:
