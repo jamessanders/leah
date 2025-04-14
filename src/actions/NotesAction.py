@@ -9,9 +9,14 @@ class NotesAction(IAction):
 
     def getTools(self):
         return [
-            (self.add_note, "add_note", "Add a note to your notes, these can be used to answer the user's query. Example notes would be 'todo.txt', 'user_info.txt', 'meeting_notes.txt'", {"note_name": "<the name of the note to add>", "note_content": "<the content of the note to add>"}),
-            (self.read_note, "read_note", "Read a note from your notes, these can be used to answer the user's query. Example notes would be 'todo.txt', 'user_info.txt', 'meeting_notes.txt'", {"note_name": "<the name of the note to get>"}),
-            (self.edit_note, "edit_note", "Edit a note from your notes, always pull the latest version of the note before editing and include the latest version in the note content", {"note_name": "<the name of the note to edit>", "note_content": "<the content of the note to edit>"}),
+            (self.put_note, 
+             "put_note", 
+             "Add a note in your notes files, these can be used to answer the user's query. Note names should be in the format of 'note_name.txt'", 
+             {"note_name": "<the name of the note to add>", "note_content": "<the content of the note to add>"}),
+            (self.get_note,
+              "get_note", 
+              "Get a note from your notes, these can be used to answer the user's query. Note names should be in the format of 'note_name.txt'", 
+              {"note_name": "<the name of the note to get>"}),
             (self.list_notes, "list_notes", "List all the notes you have, this will be used to answer the user's query", {})
         ]
 
@@ -30,13 +35,12 @@ Here is the query:
 Answer the query using the context provided above.
 """
     
-    def add_note(self, arguments):
+    def put_note(self, arguments):
         config_manager = self.config_manager
         notes_manager = config_manager.get_notes_manager()
-        notes_manager.put_note(arguments["note_name"], arguments["note_content"])
-        yield ("result", f"Just say 'ok note {arguments['note_name']} added'")
+        yield ("result", self.context_template(self.query, notes_manager.get_note(arguments["note_name"]), arguments["note_name"]))
 
-    def read_note(self, arguments):
+    def get_note(self, arguments):
         config_manager = self.config_manager
         notes_manager = config_manager.get_notes_manager()
         yield ("result", self.context_template(self.query, notes_manager.get_note(arguments["note_name"]), arguments["note_name"]))
@@ -45,9 +49,3 @@ Answer the query using the context provided above.
         config_manager = self.config_manager
         notes_manager = config_manager.get_notes_manager()
         yield ("result", "Here are all the notes you have: " + str(", ".join(notes_manager.get_all_notes())) + " answer the query based on this information, the query is: " + self.query)
-
-    def edit_note(self, arguments):
-        config_manager = self.config_manager
-        notes_manager = config_manager.get_notes_manager()
-        notes_manager.put_note(arguments["note_name"], notes_manager.get_note(arguments["note_name"]) + "\n" + arguments["note_content"])
-        yield ("result", f"Just say 'ok note {arguments['note_name']} updated'")
