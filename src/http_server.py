@@ -248,15 +248,15 @@ def after_request_cleanup(username, persona, parsed_history, full_response):
     notesManager = config_manager.get_notes_manager()
     memories = notesManager.get_note(f"memories/memories_{persona}.txt")
     if not memories:
-        notesManager.put_note(f"memories/memories_{persona}.txt", "I am a helpful assistant that can remember things.")
-    memories = notesManager.get_note(f"memories_{persona}.txt")
+        notesManager.put_note(f"memories/memories_{persona}.txt", "No previous notes.")
+    memories = notesManager.get_note(f"memories/memories_{persona}.txt")
     parsed_history.append({"role": "assistant", "content": full_response})
     parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
     prompt = memory_template(memories)
     persona_override = {
-        "system_content": "You are a rigorous and detailed note taker that can remember things."
+        "system_content": "You are a rigorous and detailed note taker.\n\n" + prompt
     }
-    result = ask_agent(persona, prompt, conversation_history=parsed_history, persona_override=persona_override)
+    result = ask_agent(persona, "Generate new notes based on the conversation and the previous notes.", conversation_history=parsed_history, persona_override=persona_override)
     notesManager.put_note(f"memories/memories_{persona}.txt", result)
     
 
@@ -340,6 +340,7 @@ def query():
             for chunk in response:
                     try:
                         if isinstance(chunk, str):
+                            yield f"data: {json.dumps({'content': chunk})}\n\n"
                             continue
                         else:
                             content = chunk.choices[0].delta.content
