@@ -231,7 +231,7 @@ START OF PREVIOUS NOTES
 END OF PREVIOUS NOTES
 
 Instructions:
-Create detailed notes about the conversation and combine them with the previous notes.
+Create detailed notes about the conversation and combine them with the previous memories.
 Make sure to keep a profile of the user and their interests.
 Make sure to keep a profile of your own knowledge, particularily any information about the user.
 Make sure to keep a profile of your self and you relationship with the user.
