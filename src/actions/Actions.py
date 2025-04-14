@@ -53,6 +53,8 @@ Prompt: You are a helpful assistant that can use the following tools to answer t
 If you need to use a tool, respond with the tool name and arguments in the json format, start with START_TOOL_JSON and end with END_TOOL_JSON.
 The json should be in the format of {"tool_name": "tool_name", "arguments": {"argument_name": "argument_value"}}
 Tool names should be in the format of ActionName.ToolName
+Do not ask the user to provide the tool name, just respond with the json.
+Do not ask the user if you can use a tool, just respond with the json.
 If no tool is needed, respond with @other.
 The tools are listed below in the format of Tool Name, Tool Description, and Tool Arguments.
 Tools: 
