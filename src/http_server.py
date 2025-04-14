@@ -346,7 +346,6 @@ def query():
                         if content:
                             buffered_content += content
                             full_response += content
-                            print("Content: " + content)
                             if not buffer_mode and content.startswith("@"):
                                 buffer_mode = True
                                 check_buffer = ""
@@ -358,7 +357,6 @@ def query():
                                     check_buffer = ""
                                     continue
                                 else:
-                                    print("Check buffer: " + check_buffer)
                                     continue
                             else:
                                 if buffered_content.endswith(('.', '!', '?')) and len(buffered_content) > 256:
@@ -378,7 +376,6 @@ def query():
                     except json.JSONDecodeError as e:
                         print(f"Error decoding JSON: {e}")
 
-            print("Check buffer: " + check_buffer)
             if not "@FETCH" in full_response:
                 # After the loop, check for any remaining buffered content
                 if buffered_content:
@@ -395,14 +392,10 @@ def query():
                 break
             else:
                 try:
-                    print("Full response we should parse: " + full_response)
                     parsed_response = full_response[full_response.find("@FETCH"):].strip()
                     parsed_response = full_response.replace("@FETCH ", "").split(" ");
-                    print("Parsed response: " + str(parsed_response))
                     tool_name = parsed_response[0]
                     tool_arguments = json.loads(" ".join(parsed_response[1:]))
-                    print("Tool name: " + tool_name)
-                    print("Tool arguments: " + str(tool_arguments))
                     log_manager = config_manager.get_log_manager()
                     log_manager.log("tool", tool_name + " " + str(tool_arguments), persona)
                     for type,message in actions.run_tool(tool_name, tool_arguments):
@@ -412,7 +405,6 @@ def query():
                             parsed_history = parsed_history[:-1]
                         parsed_history.append({"role": "user", "content": message})
                         data['query'] = message
-                        print("Parsed history: " + str(parsed_history))
                         yield system_message("Query rewritten: " + message)
                 except Exception as e:
                     print("Error parsing full response: " + str(e))
