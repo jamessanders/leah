@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from actions import LinkAction, WeatherAction
+from actions import LinkAction, TimeAction, WeatherAction
 import json
 
 class Actions:
@@ -31,7 +31,8 @@ class Actions:
         
         self.actions = [
             LinkAction.LinkAction(config_manager, persona, query, conversation_history),
-            WeatherAction.WeatherAction(config_manager, persona, query, conversation_history)
+            WeatherAction.WeatherAction(config_manager, persona, query, conversation_history),
+            TimeAction.TimeAction(config_manager, persona, query, conversation_history)
         ]
 
     def run_tool(self, tool_name: str, arguments: List[str]) -> str:
@@ -50,12 +51,13 @@ class Actions:
     def get_actions_prompt(self) -> str:
         prompt = """
 Prompt: You are a helpful assistant that can use the following tools to answer the user's question. 
-If you need to use a tool, respond with the tool name and arguments in the json format, start with START_TOOL_JSON and end with END_TOOL_JSON.
-The json should be in the format of {"tool_name": "tool_name", "arguments": {"argument_name": "argument_value"}}
+If a tool is required your response must start with @FETCH and no other text.
+The response must be in the format of @FETCH <tool_name> <arguments_json>
+arguments_json should be in the format of {"argument_name": "argument_value"}
 Tool names should be in the format of ActionName.ToolName
-Do not ask the user to provide the tool name, just respond with the json.
-Do not ask the user if you can use a tool, just respond with the json.
-If no tool is needed, respond with @other.
+Do not ask the user to provide the tool name, just respond with the tool.
+Do not ask the user if you can use a tool, just respond with the tool.
+If no tool is needed, respond as usual.
 The tools are listed below in the format of Tool Name, Tool Description, and Tool Arguments.
 Tools: 
 

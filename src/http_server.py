@@ -269,7 +269,6 @@ def query():
     config_manager = LocalConfigManager(g.username)
     original_query = data.get('query', '')
     def generate_stream():    
-        system_responses = []
         # Get the persona from the request, default to 'leah' if not specified
         persona = data.get('persona', 'leah')
         # Assuming config is available in this context
@@ -283,7 +282,6 @@ def query():
         # Extract conversation history from the request
         conversation_history = data.get('history', [])
 
-        
         # Parse and validate the conversation history
         parsed_history = []
         for entry in conversation_history:
@@ -292,113 +290,117 @@ def query():
             else:
                 print(f"Invalid entry in conversation history: {entry}")
 
-        actions = Actions.Actions(config_manager, persona, data.get('query', ''), conversation_history)
-        actions_prompt = actions.get_actions_prompt()
-        print("Actions prompt: " + actions_prompt)
-
         notesManager = config_manager.get_notes_manager()
         memories = notesManager.get_note(f"memories_{persona}.txt")
         if memories:
             memories = "These are your notes from previous conversations: " + memories
         else:
             memories = "You are a helpful assistant that can remember things."
-                                         
-        if True or use_broker:
-            message = ask_agent("broker", data.get('query', ''), conversation_history=parsed_history, persona_override={"system_content":memories + "\n\n" + actions_prompt})
-            yield system_message("Broker returned: " + message)
-            print("Broker returned: " + message)
 
-            if "START_TOOL_JSON" in message:
-                message = message.split("START_TOOL_JSON")[1]
-                message = message[message.find("{"):]
-                message = message[:message.rfind("}")+1]
-                json_message = dirtyjson.loads(message)
-                print("Tool message: " + str(json_message))
-                for result in actions.run_tool(json_message['tool_name'], json_message['arguments']):
-                    print("Tool result: " + str(result))
-                    if result[0] == "message":
-                        yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
-                    elif result[0] == "result":
-                        data['query'] = result[1]
-                        print("Agent rewrote query to " + data['query'])
-                        yield system_message("Agent rewrote query to " + data['query'])
-                        parsed_history[-1]['content'] = data['query']
+        call_count = 0
+        while call_count < 3:  
+            call_count += 1
+            if data.get('context',''):
+                data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
+                parsed_history[-1]['content'] = data['query']
+
+            # Filter out any system messages from the history
+            parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
             
-        if data.get('context',''):
-            data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
-            parsed_history[-1]['content'] = data['query']
+            system_content = config.get_system_content(persona)
+            if use_broker:
+                actions = Actions.Actions(config_manager, persona, data.get('query', ''), conversation_history)
+                actions_prompt = actions.get_actions_prompt()
+                system_content = system_content + "\n\n" + actions_prompt
+            
+            
+            # Prepend persona's system content to the beginning of parsed history
+            
+            if system_content:
+                if memories:
+                    system_content = system_content + "\n\n" + "These are your notes from previous conversations: \n\n" + memories
+                else:
+                    print("No memories found")
 
-        # Filter out any system messages from the history
-        parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
-        # Prepend persona's system content to the beginning of parsed history
-        system_content = config.get_system_content(persona)
-        if system_content:
-            if memories:
-                system_content = system_content + "\n\n" + memories
-            else:
-                print("No memories found")
+            response = ask_agent(persona, 
+                                data.get('query', ''), 
+                                stream=True, 
+                                conversation_history=parsed_history, 
+                                persona_override={"system_content":system_content})
 
-        
-        
-        response = ask_agent(persona, 
-                             data.get('query', ''), 
-                             stream=True, 
-                             conversation_history=parsed_history, 
-                             persona_override={"system_content":system_content})
-
-        # Send the conversation history at the end of the stream
-        history_info = {
-            "type": "history",
-            "history": parsed_history
-        }
-        yield f"data: {json.dumps(history_info)}\n\n"
-
-        for system_response in system_responses:
-            yield f"data: {json.dumps({'type': 'system', 'content': system_response})}\n\n"
-
-
-        full_response = ""
-        buffered_content = ""
-        for chunk in response:
-                try:
-                    if isinstance(chunk, str):
-                        continue
-                    else:
-                        content = chunk.choices[0].delta.content
-                    if content:
-                        buffered_content += content
-                        full_response += content
-                        # Check if the buffered content ends with a sentence-ending punctuation
-                        if buffered_content.endswith(('.', '!', '?')) and len(buffered_content) > 256:
-                            # Generate voice for the complete sentence
-                            voice = config.get_voice(persona)
-                            voice_dir = os.path.join(WEB_DIR, 'voice')
-                            os.makedirs(voice_dir, exist_ok=True)
-                            voice_filename = generate_voice_file(buffered_content, username, voice, voice_dir)
-                            voice_file_info = {
-                                "voice_type": voice,
-                                "filename": voice_filename
-                            }
-                            yield f"data: {json.dumps(voice_file_info)}\n\n"
-                            # Reset the buffer
-                            buffered_content = ""
-                        yield f"data: {json.dumps({'content': content})}\n\n"
-                except json.JSONDecodeError as e:
-                    print(f"Error decoding JSON: {e}")
-
-        # After the loop, check for any remaining buffered content
-        if buffered_content:
-            plain_text_content = strip_markdown(buffered_content)
-            voice = config.get_voice(persona)
-            voice_dir = os.path.join(WEB_DIR, 'voice')
-            os.makedirs(voice_dir, exist_ok=True)
-            voice_filename = generate_voice_file(plain_text_content, username, voice, voice_dir)
-            voice_file_info = {
-                "voice_type": voice,
-                "filename": voice_filename
+            # Send the conversation history at the end of the stream
+            history_info = {
+                "type": "history",
+                "history": parsed_history
             }
-            yield f"data: {json.dumps(voice_file_info)}\n\n"
+            yield f"data: {json.dumps(history_info)}\n\n"
 
+            full_response = ""
+            buffered_content = ""
+            for chunk in response:
+                    try:
+                        if isinstance(chunk, str):
+                            continue
+                        else:
+                            content = chunk.choices[0].delta.content
+                        if content:
+                            buffered_content += content
+                            full_response += content
+                            # Check if the buffered content ends with a sentence-ending punctuation
+                            if not full_response.startswith("@"):
+                                if buffered_content.endswith(('.', '!', '?')) and len(buffered_content) > 256:
+                                    # Generate voice for the complete sentence
+                                    voice = config.get_voice(persona)
+                                    voice_dir = os.path.join(WEB_DIR, 'voice')
+                                    os.makedirs(voice_dir, exist_ok=True)
+                                    voice_filename = generate_voice_file(buffered_content, username, voice, voice_dir)
+                                    voice_file_info = {
+                                        "voice_type": voice,
+                                        "filename": voice_filename
+                                    }
+                                    yield f"data: {json.dumps(voice_file_info)}\n\n"
+                                    # Reset the buffer
+                                    buffered_content = ""
+                                yield f"data: {json.dumps({'content': content})}\n\n"
+                    except json.JSONDecodeError as e:
+                        print(f"Error decoding JSON: {e}")
+
+            if not full_response.startswith("@"):
+                # After the loop, check for any remaining buffered content
+                if buffered_content:
+                    plain_text_content = strip_markdown(buffered_content)
+                    voice = config.get_voice(persona)
+                    voice_dir = os.path.join(WEB_DIR, 'voice')
+                    os.makedirs(voice_dir, exist_ok=True)
+                    voice_filename = generate_voice_file(plain_text_content, username, voice, voice_dir)
+                    voice_file_info = {
+                        "voice_type": voice,
+                        "filename": voice_filename
+                    }
+                    yield f"data: {json.dumps(voice_file_info)}\n\n"
+                break
+            else:
+                try:
+                    print("Full response we should parse: " + full_response)
+                    parsed_response = full_response.replace("@FETCH ", "").split(" ");
+                    tool_name = parsed_response[0]
+                    tool_arguments = json.loads(" ".join(parsed_response[1:]))
+                    print("Tool name: " + tool_name)
+                    print("Tool arguments: " + str(tool_arguments))
+                    log_manager = config_manager.get_log_manager()
+                    log_manager.log("tool", tool_name + " " + str(tool_arguments), persona)
+                    for type,message in actions.run_tool(tool_name, tool_arguments):
+                        if type == "system":
+                            yield f"data: {json.dumps({'type': 'system', 'content': message})}\n\n"
+                        elif type == "result":
+                            parsed_history = parsed_history[:-1]
+                        parsed_history.append({"role": "user", "content": message})
+                        yield system_message("Query rewritten: " + message)
+                except Exception as e:
+                    print("Error parsing full response: " + str(e))
+                    use_broker = False
+
+            
         yield f"data: {json.dumps({'type': 'end', 'content': 'END OF RESPONSE'})}\n\n"
 
         log_manager = config_manager.get_log_manager()

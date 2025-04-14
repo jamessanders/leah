@@ -14,6 +14,31 @@ class LogManager:
         if not os.path.exists(self.logs_directory):
             os.makedirs(self.logs_directory, exist_ok=True)
 
+    def log(self, message_type: str, message: str, persona: str = "default") -> None:
+        """
+        Log a tool message with a timestamp.
+        
+        Args:
+            message_type (str): The type of message ('user' or 'assistant')
+            message (str): The message content to log   
+            persona (str): The persona name to organize logs under (default: "default")
+        """
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        log_entry = f"[{timestamp}] {message_type.upper()}: {message}\n"
+        
+        # Create persona-specific directory under logs/chat/
+        logs_dir = os.path.join(self.logs_directory, "logs", persona)
+        if not os.path.exists(logs_dir):
+            os.makedirs(logs_dir, exist_ok=True)
+
+        # Create a log file for the current date
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        log_file = os.path.join(logs_dir, f"log_{current_date}.log")
+        
+        # Append the log entry to the file
+        with open(log_file, 'a', encoding='utf-8') as file:
+            file.write(log_entry) 
+
     def log_chat(self, message_type: str, message: str, persona: str = "default") -> None:
         """
         Log a chat message with a timestamp.

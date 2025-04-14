@@ -34,6 +34,7 @@ class WeatherAction(IAction):
 Here is some context for the query (in json format):
 {context}
 
+You just fetched the weather for the location. from the source below.
 Source: {extracted_url} (Last updated {today})
 
 Here is the query:
