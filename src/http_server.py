@@ -3,6 +3,7 @@ from flask import Flask, send_from_directory, request, jsonify, g
 import os
 from LogManager import LogManager
 from NotesManager import NotesManager
+from actions import Actions
 from call_llm_api import ask_agent
 from config import Config
 import json
@@ -23,6 +24,7 @@ from LocalConfigManager import LocalConfigManager
 import dirtyjson
 from AuthManager import AuthManager
 from functools import wraps
+from actions import Actions
 
 app = Flask(__name__)
 
@@ -290,26 +292,37 @@ def query():
             else:
                 print(f"Invalid entry in conversation history: {entry}")
 
-        if use_broker:
-            message = ask_agent("broker", data.get('query', ''))
+        actions = Actions.Actions(config_manager, persona, data.get('query', ''), conversation_history)
+        actions_prompt = actions.get_actions_prompt()
+        print("Actions prompt: " + actions_prompt)
+
+        notesManager = config_manager.get_notes_manager()
+        memories = notesManager.get_note(f"memories_{persona}.txt")
+        if memories:
+            memories = "These are your notes from previous conversations: " + memories
+        else:
+            memories = "You are a helpful assistant that can remember things."
+                                         
+        if True or use_broker:
+            message = ask_agent("broker", data.get('query', ''), conversation_history=parsed_history, persona_override={"system_content":memories + "\n\n" + actions_prompt})
             yield system_message("Broker returned: " + message)
-            try:
-                if (message.startswith("```json")):
-                    message = message[message.find("{"):]
-                    message = message[:message.rfind("}")+1]
+            print("Broker returned: " + message)
+
+            if "START_TOOL_JSON" in message:
+                message = message.split("START_TOOL_JSON")[1]
+                message = message[message.find("{"):]
+                message = message[:message.rfind("}")+1]
                 json_message = dirtyjson.loads(message)
-                if (not json_message['tool'] == "other") and get_agent(json_message['tool']):
-                    tool = json_message.get('tool', '')
-                    arguments = json_message.get('arguments', [])
-                    for result in get_agent(tool)(data.get('query', ''), parsed_history, arguments):
-                        if (result[0] == "message"):
-                            yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
-                        elif (result[0] == "result"):
-                            data['query'] = result[1]
-                            yield system_message("Agent rewrote query to " + data['query'])
-                            parsed_history[-1]['content'] = data['query']
-            except Exception as e:
-                yield system_message("Broker did not return anything useful: " + str(e))
+                print("Tool message: " + str(json_message))
+                for result in actions.run_tool(json_message['tool_name'], json_message['arguments']):
+                    print("Tool result: " + str(result))
+                    if result[0] == "message":
+                        yield f"data: {json.dumps({'type': 'system', 'content': result[1]})}\n\n"
+                    elif result[0] == "result":
+                        data['query'] = result[1]
+                        print("Agent rewrote query to " + data['query'])
+                        yield system_message("Agent rewrote query to " + data['query'])
+                        parsed_history[-1]['content'] = data['query']
             
         if data.get('context',''):
             data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
@@ -320,10 +333,8 @@ def query():
         # Prepend persona's system content to the beginning of parsed history
         system_content = config.get_system_content(persona)
         if system_content:
-            notesManager = NotesManager(config_manager)
-            memories = notesManager.get_note(f"memories_{persona}.txt")
             if memories:
-                system_content = system_content + "\n\n" + "These are your notes from previous conversations: " + memories
+                system_content = system_content + "\n\n" + memories
             else:
                 print("No memories found")
 
