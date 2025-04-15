@@ -88,7 +88,7 @@ def watch_queue():
     while True:
         try:
             # Wait for 2 minutes
-            time.sleep(60)
+            time.sleep(60*10)
             # Check if there is an item in the queue
             if not cleanup_queue.empty():
                 # Get the item from the queue
@@ -297,9 +297,10 @@ def query():
         else:
             memories = "You are a helpful assistant that can remember things."
 
+        max_calls = 3
         call_count = 0
         loop_on = True
-        while loop_on and call_count < 3:  
+        while loop_on and call_count < max_calls:  
             call_count += 1
             buffer_mode = False
             check_buffer = ""
@@ -389,21 +390,18 @@ def query():
                         loop_on = False
                         print(f"Error decoding JSON: {e}")
 
-            if not tools:
-                # After the loop, check for any remaining buffered content
-                if buffered_content:
-                    plain_text_content = strip_markdown(buffered_content)
-                    voice = config.get_voice(persona)
-                    voice_dir = os.path.join(WEB_DIR, 'voice')
-                    os.makedirs(voice_dir, exist_ok=True)
-                    voice_filename = generate_voice_file(plain_text_content, username, voice, voice_dir)
-                    voice_file_info = {
-                        "voice_type": voice,
-                        "filename": voice_filename
-                    }
-                    yield f"data: {json.dumps(voice_file_info)}\n\n"
-                break
-            else:
+            if buffered_content:
+                plain_text_content = strip_markdown(buffered_content)
+                voice = config.get_voice(persona)
+                voice_dir = os.path.join(WEB_DIR, 'voice')
+                os.makedirs(voice_dir, exist_ok=True)
+                voice_filename = generate_voice_file(plain_text_content, username, voice, voice_dir)
+                voice_file_info = {
+                    "voice_type": voice,
+                    "filename": voice_filename
+                }
+                yield f"data: {json.dumps(voice_file_info)}\n\n"
+            if tools:
                 try:
                     for tool in tools:
                         parsed_response = tool[tool.find(prefix)+len(prefix):].strip()
@@ -438,10 +436,12 @@ def query():
                     print(error_message)
                     yield f"data: {json.dumps({'content': error_message})}\n\n"
                     loop_on = False
+            else:
+                break
 
-        if call_count >= 3:
+        if call_count >= max_calls:
             yield f"data: {json.dumps({'content': '...'})}\n\n"
-            
+        print("Raw response: " + raw_response)   
         yield f"data: {json.dumps({'type': 'end', 'content': 'END OF RESPONSE'})}\n\n"
 
         log_manager = config_manager.get_log_manager()

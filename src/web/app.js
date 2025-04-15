@@ -238,6 +238,15 @@ const App = () => {
                 }),
             });
 
+            const status = res.status;
+            if (status === 401) {
+                setIsAuthenticated(false);
+                setUsername('');
+                setToken('');
+                setConversationHistory([]);
+                setResponses([]);
+                return;
+            }
             const reader = res.body.getReader();
             const decoder = new TextDecoder('utf-8');
 
