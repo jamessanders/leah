@@ -88,7 +88,7 @@ def watch_queue():
     while True:
         try:
             # Wait for 2 minutes
-            time.sleep(60*10)
+            time.sleep(60)
             # Check if there is an item in the queue
             if not cleanup_queue.empty():
                 # Get the item from the queue
@@ -443,8 +443,7 @@ def query():
                 break
 
         if call_count >= max_calls:
-            yield f"data: {json.dumps({'content': '...'})}\n\n"
-        print("Raw response: " + raw_response)   
+            yield f"data: {json.dumps({'content': '...'})}\n\n"  
         yield f"data: {json.dumps({'type': 'end', 'content': 'END OF RESPONSE'})}\n\n"
 
         log_manager = config_manager.get_log_manager()

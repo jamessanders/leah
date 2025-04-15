@@ -127,16 +127,18 @@ class LogManager:
         Returns:
             list[str]: A list of log file paths.
         """
-        log_files = []
+        log_entries = []
         chat_dir = os.path.join(self.logs_directory, "chat", persona)
         if not os.path.exists(chat_dir):
-            return log_files
+            return log_entries
 
         current_date = datetime.now().date()
         for i in range(days + 1):
             date_to_check = current_date - timedelta(days=i)
             log_file = os.path.join(chat_dir, f"chat_{date_to_check.strftime('%Y-%m-%d')}.log")
             if os.path.exists(log_file):
-                log_files.append(log_file)
+                with open(log_file, 'r', encoding='utf-8') as file:
+                    for line in file:
+                        log_entries.append(" ".join(line.split(" ")[:200]).replace("\\n","\n"))
 
-        return log_files 
+        return log_entries 
