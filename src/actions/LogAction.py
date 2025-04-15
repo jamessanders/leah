@@ -1,0 +1,57 @@
+from typing import List, Dict, Any
+from .IActions import IAction
+
+class LogAction(IAction):
+    def __init__(self, config_manager, persona: str, query: str, conversation_history: List[Dict[str, Any]]):
+        self.config_manager = config_manager
+        self.persona = persona
+        self.query = query
+        self.conversation_history = conversation_history
+
+    def getTools(self) -> List[tuple]:
+        return [
+            (self.logIndex, "log_index", "Logs a list of index terms related to the query and the response.", {"terms": "<comma separated list of index terms>"}),
+            (self.searchLog, "search_log", "Searches past conversation logs for search terms related to the query and the response. Use this tool to find information from past conversations. Provide multiple terms to search for to expand the search.", {"terms": "<comma separated list of search terms>"})
+        ]
+    
+    def context_template(self, message: str, context: str) -> str:
+        return f"""
+Here is some context for the query:
+
+{context}
+
+Source: logs of past conversations 
+
+Here is the query:
+
+{message}
+
+Answer the query using the context provided above.
+"""
+
+    def logIndex(self, arguments: Dict[str, Any]):
+        logManager = self.config_manager.get_log_manager()
+        terms = arguments["terms"].split(",")
+        for term in terms:
+            logManager.log_index_item(term, self.query.replace("\n", "\\n"), self.persona)
+            logManager.log_index_item(term, self.conversation_history[-1]["content"].replace("\n", "\\n"), self.persona)
+        yield ("end", "Index terms logged")
+
+    def searchLog(self, arguments: Dict[str, Any]):
+        logManager = self.config_manager.get_log_manager()
+        terms = arguments["terms"].split(",")
+        results = []
+        for term in terms:
+            for result in logManager.search_log_item(self.persona, term):
+                results.append(result)
+        if not results:
+            yield ("result", self.context_template(self.query, "No results found in logs, do not search logs for this query."))
+        else:
+            yield ("result", self.context_template(self.query, "\n".join(results)))
+
+
+    def addition_notes(self) -> str:
+        return """Follow the response to every query with a tool that logs a list of index terms related to the query and the response. Use the LogAction.log_index tool to log a list of index terms. Do not tell the user that you are logging index terms, just do it. Do this for every response!"""
+    
+    
+
