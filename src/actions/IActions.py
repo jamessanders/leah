@@ -28,3 +28,9 @@ class IAction(ABC):
             List[tuple]: A list of tuples (Callable<arguments>, str, dict)
         """
         pass 
+
+    def addition_notes(self) -> str:
+        """
+        Returns a string of additional notes for the action.
+        """
+        return ""

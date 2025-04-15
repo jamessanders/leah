@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from actions import LinkAction, NotesAction, TimeAction, WeatherAction
+from actions import LinkAction, LogAction, NotesAction, TimeAction, WeatherAction    
 import json
 
 class Actions:
@@ -33,7 +33,8 @@ class Actions:
             LinkAction.LinkAction(config_manager, persona, query, conversation_history),
             WeatherAction.WeatherAction(config_manager, persona, query, conversation_history),
             TimeAction.TimeAction(config_manager, persona, query, conversation_history),
-            NotesAction.NotesAction(config_manager, persona, query, conversation_history)
+            NotesAction.NotesAction(config_manager, persona, query, conversation_history),
+            LogAction.LogAction(config_manager, persona, query, conversation_history)
         ]
 
     def run_tool(self, tool_name: str, arguments: List[str]) -> str:
@@ -50,18 +51,27 @@ class Actions:
         yield "Tool not found"
 
     def get_actions_prompt(self) -> str:
+        
+        additional_notes = ""
+        for action in self.actions:
+            if action.addition_notes():
+                additional_notes += " - " + action.addition_notes() + "\n"
+  
         prompt = """
-Prompt: You are a helpful assistant that can use the following tools to answer the user's question. 
-If a tool is required your response must start with @FETCH and no other text.
-The response must be in the format of @FETCH <tool_name> <arguments_json>
-arguments_json should be in the format of {"argument_name": "argument_value"}
-Tool names should be in the format of ActionName.ToolName
-Do not ask the user to provide the tool name, just respond with the tool.
-Do not ask the user if you can use a tool, just respond with the tool.
-If no tool is needed, respond as usual.
-The tools are listed below in the format of Tool Name, Tool Description, and Tool Arguments.
-Tools: 
+## Please follow these instructions:
+ - Request a tool in the format of json: `{"action": "ActionName.tool_name", "arguments": "arguments_json"}`
+ - Wrap the tool request in tool_code type markdown code block.  An example is:
+            ```tool_code
+            {"action": "ActionName.tool_name", "arguments": "arguments_json"}
+            ```
+ - The tool request should be in plain text without any formatting.
+ - arguments_json should be in the format of {"argument_name": "argument_value"}
+ - Tool names should be in the format of ActionName.ToolName
+ - You can use multiple tools in a single response.
+ - Do not ask the user to provide the tool name, just respond with the tool.
+""" + "\n" + additional_notes + """
 
+## Tools: 
 """
         for action in self.actions:
             actionName = action.__class__.__name__
@@ -71,8 +81,8 @@ Tools:
                 actionArgs = json.dumps(tool[3])
                 prompt += f"""
 Tool Name: {actionName}.{tool[1]}
-Tool Description: {actionDescription}
-Tool Arguments: {actionArgs}
+  - Description: {actionDescription}
+  - Arguments: {actionArgs}
 
 """
         return prompt

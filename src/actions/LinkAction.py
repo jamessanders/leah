@@ -21,6 +21,9 @@ class LinkAction(IAction):
             "success": True
         }
 
+    def addition_notes(self) -> str:
+        return " - You can fetch any URL from the internet.  Always use the fetch_link tool to fetch the contents of a URL."
+
     def getTools(self) -> List[tuple]:
         # Return a list of callable tools and their descriptions
         return [
@@ -75,11 +78,14 @@ Answer the query using the context provided above.
 
 
     def fetch_link(self, arguments: Dict[str, Any]):
-        url = arguments['url']
-        with urllib.request.urlopen(url) as response:
-            html = response.read()
-            status_code = response.getcode()
-        if status_code != 200:
+        try:
+            url = arguments['url']
+            with urllib.request.urlopen(url) as response:
+                html = response.read()
+                status_code = response.getcode()
+            if status_code != 200:
+                yield ("result", self.context_template(self.query, "Error fetching the url", url))
+            else:
+                yield ("result", self.context_template(self.query, self.extract_main_content(html, url), url))
+        except Exception as e:
             yield ("result", self.context_template(self.query, "Error fetching the url", url))
-        else:
-            yield ("result", self.context_template(self.query, self.extract_main_content(html, url), url))

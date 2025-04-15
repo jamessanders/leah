@@ -35,6 +35,37 @@ class LogManager:
         with open(log_file, 'a', encoding='utf-8') as file:
             file.write(log_entry) 
 
+    def log_index_item(self, term: str, message: str, persona: str = "default") -> None:
+        """
+        Log an index item with a timestamp.
+        
+        Args:
+            term (str): The term to log
+            message (str): The message to log
+            persona (str): The persona name to organize logs under (default: "default")
+        """
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        log_entry = f"[{timestamp}] {term}: {message}\n"
+        
+        # Create a log file for the current term in the logs/index/persona directory
+        index_dir = os.path.join(self.logs_directory, "index", persona)
+        if not os.path.exists(index_dir):
+            os.makedirs(index_dir, exist_ok=True)
+        log_file = os.path.join(index_dir, f"{term}.log")
+        with open(log_file, 'a', encoding='utf-8') as file:
+            file.write(log_entry)
+        
+    def search_log_item(self, persona: str, term: str) -> list[str]:
+        """
+        Search the log for an index item with a timestamp.
+        """
+        log_file = os.path.join(self.logs_directory, "index", persona, f"{term}.log")
+        if not os.path.exists(log_file):
+            return []
+        with open(log_file, 'r', encoding='utf-8') as file:
+            return file.readlines()
+
+
     def log_chat(self, message_type: str, message: str, persona: str = "default") -> None:
         """
         Log a chat message with a timestamp.

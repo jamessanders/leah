@@ -1,8 +1,8 @@
 from datetime import datetime
 from typing import Any, Dict, List
+from .IActions import IAction
 
-
-class TimeAction:
+class TimeAction(IAction):
     def __init__(self, config_manager, persona: str, query: str, conversation_history: List[Dict[str, Any]]):
         self.config_manager = config_manager
         self.persona = persona
@@ -28,4 +28,4 @@ Answer the query using the context provided above.
 """
     def get_time(self, arguments: Dict[str, Any]):
         timeAndDate = "The time and date is " + datetime.now().strftime("%I:%M %p on %A, %B %d %Y") + "\n\n" 
-        return ("result", self.context_template(self.query, timeAndDate))
+        yield ("result", self.context_template(self.query, timeAndDate))

@@ -298,7 +298,8 @@ def query():
             memories = "You are a helpful assistant that can remember things."
 
         call_count = 0
-        while call_count < 3:  
+        loop_on = True
+        while loop_on and call_count < 3:  
             call_count += 1
             buffer_mode = False
             check_buffer = ""
@@ -321,7 +322,6 @@ def query():
                 actions_prompt = actions.get_actions_prompt()
                 system_content = system_content + "\n\n" + actions_prompt
             
-
             response = ask_agent(persona, 
                                 data.get('query', ''), 
                                 stream=True, 
@@ -335,8 +335,12 @@ def query():
             }
             yield f"data: {json.dumps(history_info)}\n\n"
 
+            raw_response = ""
             full_response = ""
             buffered_content = ""
+            tools = []
+            prefix = "```tool_code"
+            postfix = "```"
             for chunk in response:
                     try:
                         if isinstance(chunk, str):
@@ -345,39 +349,47 @@ def query():
                         else:
                             content = chunk.choices[0].delta.content
                         if content:
-                            buffered_content += content
-                            full_response += content
-                            if not buffer_mode and content.startswith("@"):
-                                buffer_mode = True
-                                check_buffer = ""
-                            if buffer_mode:
-                                check_buffer = check_buffer + content
-                                if len(check_buffer) >= 7 and not check_buffer.startswith("@FETCH"):
-                                    buffer_mode = False
-                                    yield f"data: {json.dumps({'content': check_buffer})}\n\n"
+                            for character in content:
+                                raw_response += character
+                                if not buffer_mode and character == prefix[0]:
+                                    buffer_mode = True
                                     check_buffer = ""
-                                    continue
+                                if buffer_mode:
+                                    check_buffer = check_buffer + character
+                                    if len(check_buffer) >= len(prefix) and not check_buffer.startswith(prefix):
+                                        buffer_mode = False
+                                        yield f"data: {json.dumps({'content': check_buffer})}\n\n"
+                                        buffered_content += check_buffer
+                                        full_response += check_buffer
+                                        continue
+                                    if len(check_buffer) >= len(prefix) and check_buffer.endswith(postfix):
+                                        buffer_mode = False
+                                        tools.append(check_buffer)
+                                        continue
+                                    else:
+                                        continue
                                 else:
-                                    continue
-                            else:
-                                if buffered_content.endswith(('.', '!', '?')) and len(buffered_content) > 256:
-                                    # Generate voice for the complete sentence
-                                    voice = config.get_voice(persona)
-                                    voice_dir = os.path.join(WEB_DIR, 'voice')
-                                    os.makedirs(voice_dir, exist_ok=True)
-                                    voice_filename = generate_voice_file(buffered_content, username, voice, voice_dir)
-                                    voice_file_info = {
-                                        "voice_type": voice,
-                                        "filename": voice_filename
-                                    }
-                                    yield f"data: {json.dumps(voice_file_info)}\n\n"
-                                    # Reset the buffer
-                                    buffered_content = ""
-                                yield f"data: {json.dumps({'content': content})}\n\n"
+                                    buffered_content += character
+                                    full_response += character
+                                    if buffered_content.endswith(('.', '!', '?')) and len(buffered_content) > 256:
+                                        # Generate voice for the complete sentence
+                                        voice = config.get_voice(persona)
+                                        voice_dir = os.path.join(WEB_DIR, 'voice')
+                                        os.makedirs(voice_dir, exist_ok=True)
+                                        voice_filename = generate_voice_file(buffered_content, username, voice, voice_dir)
+                                        voice_file_info = {
+                                            "voice_type": voice,
+                                            "filename": voice_filename
+                                        }
+                                        yield f"data: {json.dumps(voice_file_info)}\n\n"
+                                        # Reset the buffer
+                                        buffered_content = ""
+                                    yield f"data: {json.dumps({'content': character})}\n\n"
                     except json.JSONDecodeError as e:
+                        loop_on = False
                         print(f"Error decoding JSON: {e}")
 
-            if not "@FETCH" in full_response:
+            if not tools:
                 # After the loop, check for any remaining buffered content
                 if buffered_content:
                     plain_text_content = strip_markdown(buffered_content)
@@ -393,24 +405,42 @@ def query():
                 break
             else:
                 try:
-                    parsed_response = full_response[full_response.find("@FETCH"):].strip()
-                    parsed_response = full_response.replace("@FETCH ", "").split(" ");
-                    tool_name = parsed_response[0]
-                    tool_arguments = json.loads(" ".join(parsed_response[1:]))
-                    log_manager = config_manager.get_log_manager()
-                    log_manager.log("tool", tool_name + " " + str(tool_arguments), persona)
-                    for type,message in actions.run_tool(tool_name, tool_arguments):
-                        if type == "system":
-                            yield f"data: {json.dumps({'type': 'system', 'content': message})}\n\n"
-                        elif type == "result":
-                            parsed_history = parsed_history[:-1]
-                        parsed_history.append({"role": "user", "content": message})
-                        data['query'] = message
-                        yield system_message("Query rewritten: " + message)
+                    for tool in tools:
+                        parsed_response = tool[tool.find(prefix)+len(prefix):].strip()
+                        parsed_response = parsed_response[:parsed_response.find(postfix)].strip()
+                        parsed_history.append({"role": "assistant", "content": full_response})
+                        parsed_response = json.loads(parsed_response.replace(prefix, "").replace(postfix, "").strip()   );
+                        tool_name = parsed_response["action"]
+                        print("Tool name: " + tool_name)
+                        tool_arguments = parsed_response["arguments"]
+                        if isinstance(tool_arguments, str):
+                            tool_arguments = json.loads(tool_arguments)
+                        print("Tool arguments: " + str(tool_arguments))
+                        log_manager = config_manager.get_log_manager()
+                        log_manager.log("tool", tool_name + " " + str(tool_arguments), persona)
+                        actions = Actions.Actions(config_manager, persona, data.get('query', ''), parsed_history)
+                        for type,message in actions.run_tool(tool_name, tool_arguments):
+                            if type == "system":
+                                yield f"data: {json.dumps({'type': 'system', 'content': message})}\n\n"
+                            elif type == "end":
+                                yield f"data: {json.dumps({'type': 'end', 'content': message})}\n\n"
+                                loop_on = False
+                            elif type == "result":
+                                parsed_history = parsed_history[:-1]
+                            parsed_history.pop()
+                            parsed_history.append({"role": "user", "content": message})
+                            data['query'] = message
+                            yield system_message("Query rewritten: " + message)
                 except Exception as e:
-                    print("Error parsing full response: " + str(e))
-                    use_broker = False
+                    import traceback
+                    error_message = f"An error occurred: {str(e)}\n"
+                    error_message += traceback.format_exc()
+                    print(error_message)
+                    yield f"data: {json.dumps({'content': error_message})}\n\n"
+                    loop_on = False
 
+        if call_count >= 3:
+            yield f"data: {json.dumps({'content': '...'})}\n\n"
             
         yield f"data: {json.dumps({'type': 'end', 'content': 'END OF RESPONSE'})}\n\n"
 
