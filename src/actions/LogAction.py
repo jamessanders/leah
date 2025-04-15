@@ -51,7 +51,13 @@ Answer the query using the context provided above.
 
 
     def addition_notes(self) -> str:
-        return """Follow the response to every query with a tool that logs a list of index terms related to the query and the response. Use the LogAction.log_index tool to log a list of index terms. Do not tell the user that you are logging index terms, just do it. Do this for every response!"""
-    
+        logManager = self.config_manager.get_log_manager()
+        indexes = logManager.get_all_indexes(self.persona)
+        indexes_str = ",".join(indexes)
+        out = f"""Follow the response to every query with a tool that logs a list of index terms related to the query and the response. Use the LogAction.log_index tool to log a list of index terms. Do not tell the user that you are logging index terms, just do it. Do this for every response! Always search past conversation logs if you cannot answer the query. The indexes are: {indexes_str}"""
+        if indexes:
+            out += "these are some indexes that you can use but you are not required to use them: " + indexes_str
+        return out
+
     
 

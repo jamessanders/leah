@@ -213,6 +213,8 @@ def generate_voice_file(plain_text_content, username, voice, voice_dir):
     plain_text_content = strip_markdown(plain_text_content)
     plain_text_content = filter_emojis(plain_text_content)
     plain_text_content = filter_urls(plain_text_content)
+    # Remove '#' character
+    plain_text_content = plain_text_content.replace('#', '')
     filename = os.path.basename(voice_file_path)
     voice_files[filename] = (plain_text_content, voice)
     voice_queue.put((filename, plain_text_content, voice))

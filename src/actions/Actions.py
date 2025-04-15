@@ -69,6 +69,7 @@ class Actions:
  - Tool names should be in the format of ActionName.ToolName
  - You can use multiple tools in a single response.
  - Do not ask the user to provide the tool name, just respond with the tool.
+ - Do not use tags like <|python_start|>
 """ + "\n" + additional_notes + """
 
 ## Tools: 

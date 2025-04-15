@@ -95,3 +95,20 @@ class LogManager:
         # Append the log entry to the file
         with open(log_file, 'a', encoding='utf-8') as file:
             file.write(log_entry) 
+
+    def get_all_indexes(self, persona: str) -> list[str]:
+        """
+        Get a list of all log file names in the logs/index directory without extensions.
+        
+        Returns:
+            list[str]: A list of log file names without extensions.
+        """
+        index_dir = os.path.join(self.logs_directory, "index", persona)
+        if not os.path.exists(index_dir):
+            return []
+        log_files = []
+        for root, _, files in os.walk(index_dir):
+            for file in files:
+                file_name, _ = os.path.splitext(file)
+                log_files.append(file_name)
+        return log_files 
