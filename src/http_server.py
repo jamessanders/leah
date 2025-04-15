@@ -408,9 +408,9 @@ def query():
                         parsed_response = parsed_response[:parsed_response.find(postfix)].strip()
                         parsed_history.append({"role": "assistant", "content": full_response})
                         parsed_response = json.loads(parsed_response.replace(prefix, "").replace(postfix, "").strip()   );
-                        tool_name = parsed_response["action"]
+                        tool_name = parsed_response.get("action", "")
                         print("Tool name: " + tool_name)
-                        tool_arguments = parsed_response["arguments"]
+                        tool_arguments = parsed_response.get("arguments", "{}")
                         if isinstance(tool_arguments, str):
                             tool_arguments = json.loads(tool_arguments)
                         print("Tool arguments: " + str(tool_arguments))
