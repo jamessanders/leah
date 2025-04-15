@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from datetime import timedelta
 
 class LogManager:
     def __init__(self, config_manager):
@@ -96,6 +97,8 @@ class LogManager:
         with open(log_file, 'a', encoding='utf-8') as file:
             file.write(log_entry) 
 
+
+
     def get_all_indexes(self, persona: str) -> list[str]:
         """
         Get a list of all log file names in the logs/index directory without extensions.
@@ -111,4 +114,29 @@ class LogManager:
             for file in files:
                 file_name, _ = os.path.splitext(file)
                 log_files.append(file_name)
+        return log_files 
+
+    def get_logs_for_days(self, persona: str, days: int) -> list[str]:
+        """
+        Get log files from the current date back to the specified number of days.
+
+        Args:
+            persona (str): The persona name to filter logs.
+            days (int): The number of days to look back.
+
+        Returns:
+            list[str]: A list of log file paths.
+        """
+        log_files = []
+        chat_dir = os.path.join(self.logs_directory, "chat", persona)
+        if not os.path.exists(chat_dir):
+            return log_files
+
+        current_date = datetime.now().date()
+        for i in range(days + 1):
+            date_to_check = current_date - timedelta(days=i)
+            log_file = os.path.join(chat_dir, f"chat_{date_to_check.strftime('%Y-%m-%d')}.log")
+            if os.path.exists(log_file):
+                log_files.append(log_file)
+
         return log_files 
