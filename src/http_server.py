@@ -425,7 +425,8 @@ def query():
                                 loop_on = False
                             elif type == "result":
                                 parsed_history = parsed_history[:-1]
-                            parsed_history.pop()
+                            if len(parsed_history) > 0:
+                                parsed_history.pop()
                             parsed_history.append({"role": "user", "content": message})
                             data['query'] = message
                             yield system_message("Query rewritten: " + message)
