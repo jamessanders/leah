@@ -411,7 +411,7 @@ def query():
                             if type == "system":
                                 yield f"data: {json.dumps({'type': 'system', 'content': message})}\n\n"
                             elif type == "end":
-                                yield f"data: {json.dumps({'type': 'end', 'content': message})}\n\n"
+                                yield f"data: {json.dumps({'content': message})}\n\n"
                                 loop_on = False
                             elif type == "result":
                                 parsed_history = parsed_history[:-1]
