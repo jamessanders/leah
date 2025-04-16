@@ -107,6 +107,10 @@ p {
     margin-top: 50px; /* Add margin to account for fixed header */
 }
 
+.responseArea::-webkit-scrollbar {
+    display: none;
+}
+
 .loadingMessage {
     font-style: italic;
     color: #9ca3af;
