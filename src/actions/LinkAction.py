@@ -35,7 +35,11 @@ class LinkAction(IAction):
             (self.fetch_link_with_selenium, 
              "fetch_url",
              "Downloads the contents of a url.  Used to fetch content of urls", 
-             {"url": "<the url of the page to fetch>"})
+             {"url": "<the url of the page to fetch>"}),
+            (self.fetch_stock_info, 
+             "fetch_stock_info",
+             "Downloads the contents of a stock info url.  Used to fetch stock info of stock symbol", 
+             {"symbol": "<the symbol of the stock to fetch>"})
         ]
     def context_template(self, message: str, context: str, extracted_url: str) -> str:
         now = datetime.now()
@@ -89,6 +93,14 @@ Answer the query using the context provided above.
                 yield ("result", self.context_template(self.query, self.extract_main_content(html, url), url))
         except Exception as e:
             yield ("result", self.context_template(self.query, "Error fetching the url", url))
+
+    def fetch_stock_info(self, arguments: Dict[str, Any]):
+        try:
+            symbol = arguments['symbol']
+            yield from self.fetch_link_with_selenium({"url": f"https://finance.yahoo.com/quote/{symbol}"})
+        except Exception as e:
+            yield ("result", self.context_template(self.query, "Error fetching the stock info", symbol))
+            
 
     def fetch_link_with_selenium(self, arguments: Dict[str, Any]):
         try:
