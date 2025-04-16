@@ -25,7 +25,7 @@ import dirtyjson
 from AuthManager import AuthManager
 from functools import wraps
 from actions import Actions
-
+from stream_processor import StreamProcessor
 app = Flask(__name__)
 
 # Create application context
@@ -211,7 +211,10 @@ Answer the query based on the context.
 """
 
 
-def generate_voice_file(plain_text_content, username, voice, voice_dir):
+def generate_voice_file(plain_text_content, username, persona):
+    config = Config()
+    voice = config.get_voice(persona)
+    voice_dir = os.path.join(WEB_DIR, 'voice')
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S"+str(random.randint(0, 1000000)))
     voice_file_path = os.path.join(voice_dir, f'{voice}_{username}_{timestamp}.mp3')
     plain_text_content = strip_markdown(plain_text_content)
@@ -301,19 +304,18 @@ def query():
         if memories:
             memories = "These are your memories from previous conversations: " + memories
         else:
-            memories = "You are a helpful assistant that can remember things."
+            memories = ""
 
         max_calls = 3
         call_count = 0
         loop_on = True
         while loop_on and call_count < max_calls:  
+            
             call_count += 1
-            buffer_mode = False
-            check_buffer = ""
+
             if data.get('context',''):
                 data['query'] = context_template(data.get('query', ''), data.get('context', ''), 'User provided context')
-                parsed_history[-1]['content'] = data['query']
-
+               
             # Filter out any system messages from the history
             parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
             
@@ -336,84 +338,65 @@ def query():
                                 persona_override={"system_content":system_content})
 
             # Send the conversation history at the end of the stream
+            sent_history = parsed_history + [{"role": "user", "content": data.get('query', '')}]
+            
             history_info = {
                 "type": "history",
-                "history": parsed_history
+                "history": sent_history
             }
             yield f"data: {json.dumps(history_info)}\n\n"
 
             raw_response = ""
             full_response = ""
-            buffered_content = ""
-            tools = []
-            prefix = "```tool_code"
-            postfix = "```"
+            voice_buffer = ""
+            
+            think_stream_processor = StreamProcessor("<think>", "</think>")
+            tool_stream_processor = StreamProcessor("```tool_code", "```")
+            json_stream_processor = StreamProcessor("```json", "```")
+            
             for chunk in response:
                     try:
                         if isinstance(chunk, str):
                             yield f"data: {json.dumps({'content': chunk})}\n\n"
                             continue
                         else:
+                            if not chunk.choices:
+                                yield f"data: {json.dumps({'content': chunk.data})}\n\n"
+                                continue
                             content = chunk.choices[0].delta.content
                         if content:
-                            for character in content:
-                                raw_response += character
-                                if not buffer_mode and character == prefix[0]:
-                                    buffer_mode = True
-                                    check_buffer = ""
-                                if buffer_mode:
-                                    check_buffer = check_buffer + character
-                                    if len(check_buffer) >= len(prefix) and not check_buffer.startswith(prefix):
-                                        buffer_mode = False
-                                        yield f"data: {json.dumps({'content': check_buffer})}\n\n"
-                                        buffered_content += check_buffer
-                                        full_response += check_buffer
-                                        continue
-                                    if len(check_buffer) >= len(prefix) and check_buffer.endswith(postfix):
-                                        buffer_mode = False
-                                        tools.append(check_buffer)
-                                        continue
-                                    else:
-                                        continue
-                                else:
-                                    buffered_content += character
-                                    full_response += character
-                                    if buffered_content.endswith(('.', '!', '?')) and len(buffered_content) > 256:
-                                        # Generate voice for the complete sentence
-                                        voice = config.get_voice(persona)
-                                        voice_dir = os.path.join(WEB_DIR, 'voice')
-                                        os.makedirs(voice_dir, exist_ok=True)
-                                        voice_filename = generate_voice_file(buffered_content, username, voice, voice_dir)
-                                        voice_file_info = {
-                                            "voice_type": voice,
-                                            "filename": voice_filename
-                                        }
-                                        yield f"data: {json.dumps(voice_file_info)}\n\n"
-                                        # Reset the buffer
-                                        buffered_content = ""
-                                    yield f"data: {json.dumps({'content': character})}\n\n"
+                            raw_response += content
+                            content = think_stream_processor.process_chunk(content)
+                            content = tool_stream_processor.process_chunk(content)
+                            content = json_stream_processor.process_chunk(content)
+                            if not content:
+                                continue
+                            else:
+                                voice_buffer += content
+                                full_response += content
+                                if voice_buffer.endswith(('.', '!', '?')) and len(voice_buffer) > 256:
+                                    # Generate voice for the complete sentence
+                                    voice_filename = generate_voice_file(voice_buffer, username, persona)
+                                    voice_file_info = {"filename": voice_filename}
+                                    yield f"data: {json.dumps(voice_file_info)}\n\n"
+                                    # Reset the buffer
+                                    voice_buffer = ""
+                                yield f"data: {json.dumps({'content': content})}\n\n"
                     except json.JSONDecodeError as e:
                         loop_on = False
                         print(f"Error decoding JSON: {e}")
 
-            if buffered_content:
-                plain_text_content = strip_markdown(buffered_content)
-                voice = config.get_voice(persona)
-                voice_dir = os.path.join(WEB_DIR, 'voice')
-                os.makedirs(voice_dir, exist_ok=True)
-                voice_filename = generate_voice_file(plain_text_content, username, voice, voice_dir)
-                voice_file_info = {
-                    "voice_type": voice,
-                    "filename": voice_filename
-                }
+            if voice_buffer:
+                voice_filename = generate_voice_file(voice_buffer, username, persona)
+                voice_file_info = {"filename": voice_filename}
                 yield f"data: {json.dumps(voice_file_info)}\n\n"
-            if tools:
+
+            tool_matches = tool_stream_processor.matches + json_stream_processor.matches
+            if tool_matches:
                 try:
-                    for tool in tools:
-                        parsed_response = tool[tool.find(prefix)+len(prefix):].strip()
-                        parsed_response = parsed_response[:parsed_response.find(postfix)].strip()
+                    for tool in tool_matches:
+                        parsed_response = json.loads(tool.strip())
                         parsed_history.append({"role": "assistant", "content": full_response})
-                        parsed_response = json.loads(parsed_response.replace(prefix, "").replace(postfix, "").strip()   );
                         tool_name = parsed_response.get("action", "")
                         print("Tool name: " + tool_name)
                         tool_arguments = parsed_response.get("arguments", "{}")
@@ -422,8 +405,7 @@ def query():
                         print("Tool arguments: " + str(tool_arguments))
                         if (not tool_name):
                             continue
-                        log_manager = config_manager.get_log_manager()
-                        log_manager.log("tool", tool_name + " " + str(tool_arguments), persona)
+                        log_manager = config_manager.get_log_manager().log("tool", tool_name + " " + str(tool_arguments), persona)
                         actions = Actions.Actions(config_manager, persona, data.get('query', ''), parsed_history)
                         for type,message in actions.run_tool(tool_name, tool_arguments):
                             if type == "system":

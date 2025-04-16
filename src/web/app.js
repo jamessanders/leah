@@ -217,7 +217,7 @@ const App = () => {
         console.log("Submitting input:", input);
         try {
             setLoading(true); // Show loading message
-            const updatedHistory = [...conversationHistory, { role: 'user', content: input }];
+            const updatedHistory = [...conversationHistory];
             setConversationHistory(updatedHistory);
             setResponses([...responses, { role: 'user', content: input }]);
             setInputValue(''); // Clear the input field before submitting
@@ -263,7 +263,6 @@ const App = () => {
                     try {
                         // Strip the 'data:' prefix and parse the JSON response
                         const jsonResponse = JSON.parse(jsonObject.replace(/^data:\s*/, ''));
-
                         if (jsonResponse.type === 'system' && jsonResponse.content) {
                             console.log('System message:', jsonResponse.content);
                         } else if (jsonResponse.type === 'end') {
@@ -290,6 +289,7 @@ const App = () => {
                             addToAudioQueue("/voice/" + jsonResponse.filename); // Add to the audio queue only if not muted
                         } else if (jsonResponse.type === "history" && jsonResponse.history) {
                             // Update the conversation history with the server's version
+                            console.log("Updating conversation history with server's version:", jsonResponse.history);
                             setConversationHistory(jsonResponse.history);
                         } 
                     } catch (error) {
