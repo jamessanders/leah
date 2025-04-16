@@ -46,7 +46,7 @@ class LogManager:
             persona (str): The persona name to organize logs under (default: "default")
         """
         timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        log_entry = f"[{timestamp}] {term}: {message}\n"
+        log_entry = f"[{timestamp}] {message}\n"
         
         # Create a log file for the current term in the logs/index/persona directory
         index_dir = os.path.join(self.logs_directory, "index", persona)

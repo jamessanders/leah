@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from NotesManager import NotesManager
 from LogManager import LogManager
-
+from config import Config
 class LocalConfigManager:
     def __init__(self, user_id: str):
         """
@@ -18,6 +18,15 @@ class LocalConfigManager:
         if not os.path.exists(self.base_dir):
             os.makedirs(self.base_dir, exist_ok=True)
     
+    def get_http_path(self, filename: str) -> str:
+        """
+        Get the full path for a file under the user's config directory.
+        
+        Args:
+            filename (str): The name of the file to get the path for
+        """
+        return "/"+self.user_id + "/" + filename
+
     def get_path(self, filename: str) -> str:
         """
         Get the full path for a file under the user's config directory.
@@ -59,3 +68,12 @@ class LocalConfigManager:
             LogManager: A LogManager instance configured for this user
         """
         return LogManager(self) 
+    
+    def get_config(self) -> Config:
+        """
+        Get a Config instance for managing configuration.
+        
+        Returns:
+            Config: A Config instance configured for this user
+        """
+        return Config()

@@ -191,6 +191,13 @@ p {
     word-break: break-word;
 }
 
+.content img {
+    max-width: 40%;
+    height: auto;
+    margin: 10px;
+    border-radius: 10px;
+}
+
 /* Media queries for responsive design */
 @media (max-width: 768px) {
     .responseBox, .userInputBox {

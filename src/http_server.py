@@ -131,16 +131,20 @@ def serve_index():
 def serve_file(filename):
     # Get the MIME type based on the file extension
     mime_type, _ = mimetypes.guess_type(filename)
-    
     # Special case for JavaScript files
     if filename.endswith('.js'):
         mime_type = 'text/javascript'
     # If no MIME type is found, default to 'application/octet-stream'
     elif mime_type is None:
         mime_type = 'application/octet-stream'
-    
     # Serve the file with the correct MIME type
     return send_from_directory(WEB_DIR, filename, mimetype=mime_type)
+
+@app.route('/generated_images/<username>/<persona>/<path:filename>')
+def serve_image(username, persona, filename):
+    config_manager = LocalConfigManager(username)
+    image_dir = os.path.join(config_manager.get_path("images"), persona)
+    return send_from_directory(image_dir, filename)
 
 # Function to strip markdown
 def strip_markdown(text):
@@ -416,6 +420,8 @@ def query():
                         if isinstance(tool_arguments, str):
                             tool_arguments = json.loads(tool_arguments)
                         print("Tool arguments: " + str(tool_arguments))
+                        if (not tool_name):
+                            continue
                         log_manager = config_manager.get_log_manager()
                         log_manager.log("tool", tool_name + " " + str(tool_arguments), persona)
                         actions = Actions.Actions(config_manager, persona, data.get('query', ''), parsed_history)
@@ -427,11 +433,11 @@ def query():
                                 loop_on = False
                             elif type == "result":
                                 parsed_history = parsed_history[:-1]
-                            if len(parsed_history) > 0:
-                                parsed_history.pop()
-                            parsed_history.append({"role": "user", "content": message})
-                            data['query'] = message
-                            yield system_message("Query rewritten: " + message)
+                                if len(parsed_history) > 0:
+                                    parsed_history.pop()
+                                parsed_history.append({"role": "user", "content": message})
+                                data['query'] = message
+                                yield system_message("Query rewritten: " + message)
                 except Exception as e:
                     import traceback
                     error_message = f"An error occurred: {str(e)}\n"

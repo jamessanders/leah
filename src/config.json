@@ -104,7 +104,7 @@
             ]
         },
         "ellie": {
-            "model": "gpt-4o-mini",
+            "model": "gpt-4.1-mini",
             "connector": "chatgpt",
             "visible": true,
             "group": "stable",
@@ -163,6 +163,7 @@
             "voice": "en-US-AvaNeural",
             "visible": true,
             "group": "experimental",
+            "use_broker": true,
             "description": "You are a professional and polished AI assistant.",
             "traits": [
                 "Business-appropriate and formal",

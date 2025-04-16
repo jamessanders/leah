@@ -32,10 +32,10 @@ Answer the query using the context provided above.
 
     def logIndex(self, arguments: Dict[str, Any]):
         logManager = self.config_manager.get_log_manager()
-        terms = arguments["terms"].split(",")
+        terms = arguments.get("terms", "").split(",")
         for term in terms:
-            logManager.log_index_item(term, self.query.replace("\n", "\\n"), self.persona)
-            logManager.log_index_item(term, self.conversation_history[-1]["content"].replace("\n", "\\n"), self.persona)
+            logManager.log_index_item(term, "[USER] " + self.query.replace("\n", "\\n"), self.persona)
+            logManager.log_index_item(term, "[ASSISTANT] " + self.conversation_history[-1]["content"].replace("\n", "\\n"), self.persona)
         yield ("end", "Index terms logged")
 
     def searchConversationLogs(self, arguments: Dict[str, Any]):

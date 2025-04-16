@@ -74,6 +74,10 @@ class Config:
         
         return persona_config
     
+    def get_stable_diffusion_config(self) -> str:
+        """Get the Stable Diffusion URL from config."""
+        return self.config.get('stable_diffusion', {})
+
     def get_system_content(self, persona='default') -> str:
         """Get the system content based on the specified persona."""
         persona_config = self._get_persona_config(persona)

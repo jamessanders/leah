@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from actions import LinkAction, LogAction, NotesAction, TimeAction, WeatherAction    
+from actions import LinkAction, LogAction, NotesAction, TimeAction, WeatherAction, ImageGen
 import json
 
 class Actions:
@@ -34,7 +34,8 @@ class Actions:
             WeatherAction.WeatherAction(config_manager, persona, query, conversation_history),
             TimeAction.TimeAction(config_manager, persona, query, conversation_history),
             NotesAction.NotesAction(config_manager, persona, query, conversation_history),
-            LogAction.LogAction(config_manager, persona, query, conversation_history)
+            LogAction.LogAction(config_manager, persona, query, conversation_history),
+            ImageGen.ImageGen(config_manager, persona, query, conversation_history)
         ]
 
     def run_tool(self, tool_name: str, arguments: List[str]) -> str:
