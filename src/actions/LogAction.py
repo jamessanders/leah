@@ -58,7 +58,7 @@ Answer the query using the context provided above.
         yield ("result", self.context_template(self.query, "\n".join(results)))
 
 
-    def addition_notes(self) -> str:
+    def additional_notes(self) -> str:
         logManager = self.config_manager.get_log_manager()
         indexes = logManager.get_all_indexes(self.persona)
         indexes_str = ",".join(indexes)

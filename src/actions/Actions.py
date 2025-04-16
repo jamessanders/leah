@@ -55,8 +55,8 @@ class Actions:
         
         additional_notes = ""
         for action in self.actions:
-            if action.addition_notes():
-                additional_notes += " - " + action.addition_notes() + "\n"
+            if action.additional_notes():
+                additional_notes += " - " + action.additional_notes() + "\n"
   
         prompt = """
 ## Please follow these instructions:
