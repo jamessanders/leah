@@ -69,6 +69,7 @@ class Actions:
  - You can use multiple tools in a single response.
  - Do not ask the user to provide the tool name, just respond with the tool.
  - Do not use tags like <|python_start|>
+ - Just use tools without telling the user that you will perform a task.
 """ + "\n" + additional_notes + """
 
 ## Tools: 

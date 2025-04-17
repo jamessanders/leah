@@ -3,7 +3,7 @@ from flask import Flask, send_from_directory, request, jsonify, g
 import os
 from LogManager import LogManager
 from NotesManager import NotesManager
-from actions import Actions
+from actions import Actions, LogAction
 from call_llm_api import ask_agent
 from config import Config
 import json
@@ -82,19 +82,23 @@ def token_required(f):
 
 # Create a queue to hold the tuples
 cleanup_queue = queue.Queue()
+indexing_queue = queue.Queue()
 
 # Function to watch the queue and process items
 def watch_queue():
     while True:
         try:
             # Wait for 2 minutes
-            time.sleep(60)
+            time.sleep(30)
             # Check if there is an item in the queue
             if not cleanup_queue.empty():
                 # Get the item from the queue
                 username, persona, parsed_history, full_response = cleanup_queue.get()
                 # Process the item
                 after_request_cleanup(username, persona, parsed_history, full_response)
+            if not indexing_queue.empty():
+                username, persona, parsed_history, full_response = indexing_queue.get()
+                after_request_indexing(username, persona, parsed_history, full_response)
         except Exception as e:
             print(f"Error in watch_queue: {e}")
 
@@ -267,7 +271,64 @@ def after_request_cleanup(username, persona, parsed_history, full_response):
     }
     result = ask_agent(persona, "Generate new notes based on the conversation and the previous notes.", conversation_history=parsed_history, persona_override=persona_override)
     notesManager.put_note(f"memories/memories_{persona}.txt", result)
+ 
+def after_request_indexing(username, persona, parsed_history, full_response):   
+    config_manager = LocalConfigManager(username)
+    query = parsed_history[-2]["content"]
+    resp = parsed_history[-1]["content"]
+    convo = (query + "\n\n" + resp).split(" ")
+    if len(convo) > 300:
+        convo = convo[:299]
+    convo = " ".join(convo)
+    script = f"""
+Return five index terms relevant to the conversation below. Return the only the terms as a comma seperated list.
+
+The conversation:
+
+{convo}
+""" 
+    terms = ask_agent("summer", script)
+    print("Logging terms: " + terms)
+    logger = LogAction.LogAction(config_manager, persona, query, parsed_history)
+    logger.logIndex({"terms": terms})
     
+    
+    
+def compress_memories(memories, query):
+    script = f"""
+Here is some context:
+
+{memories}
+
+Summarize the information above to include only the information relevant to answering the following query, make sure to label the subject for the information.  Respond only with the requested summary do not ask follow up questions.
+The query is: {query}
+"""
+    return ask_agent("summer", script)
+
+def search_past_logs(config_manager, persona, query):
+    script = f"""
+Return five index terms that can be used to search past conversations relevant to the following query, return the terms as a simple commas seperated list, return only the terms and nothing else
+
+The query is: {query}
+
+""" 
+    terms = ask_agent("summer", script)
+    print("Terms: " + terms)
+    logAction = LogAction.LogAction(config_manager, persona, query, None)
+    messages = []
+    out = []
+    for log in logAction.searchIndex(terms.split(",")):
+        if len(log) > 256:
+            log = log[:255]
+        items = log.split(" ")
+        date = items[0]
+        user = items[1]
+        message = " ".join(items[2:])
+        if not message in messages:
+            out.append(log)
+        else:
+            messages.append(message)
+    return out
 
 @app.route('/query', methods=['POST'])
 @token_required
@@ -301,10 +362,27 @@ def query():
 
         notesManager = config_manager.get_notes_manager()
         memories = notesManager.get_note(f"memories/memories_{persona}.txt")
+        
+        try:
+            memories = compress_memories(memories, data.get("query", ""))
+        except: 
+            pass
+        
+        pastlogs = "No past logs found"
+        
+        try:
+            foundlogs = search_past_logs(config_manager, persona, data.get("query",""))
+            if foundlogs:
+                pastlogs = "\n".join(foundlogs)
+        except:
+            pass
+        
         if memories:
-            memories = "These are your memories from previous conversations: " + memories
+            memories = "These are your memories from previous conversations: \n\n" + memories + "\n\nThese are some relevant conversation logs:\n\n" + pastlogs
         else:
             memories = ""
+
+        print("Memories: " + memories)
 
         max_calls = 3
         call_count = 0
@@ -458,7 +536,7 @@ def query():
             cleanup_queue.put(item)
 
         cleanup_queue.put((username, persona, parsed_history, full_response))
-
+        indexing_queue.put((username, persona, copy.deepcopy(parsed_history), full_response))
     return app.response_class(generate_stream(), mimetype='text/event-stream')
 
 @app.route('/voice/<voice_filename>')

@@ -39,13 +39,18 @@ Answer the query using the context provided above.
             logManager.log_index_item(term, "[ASSISTANT] " + self.conversation_history[-1]["content"].replace("\n", "\\n"), self.persona)
         yield ("end", "")
 
-    def searchConversationLogs(self, arguments: Dict[str, Any]):
+    def searchIndex(self, terms):
         logManager = self.config_manager.get_log_manager()
-        terms = arguments["terms"].split(",")
+        terms = terms
         results = []
         for term in terms:
             for result in logManager.search_log_item(self.persona, term):
                 results.append(result)
+        return results
+
+    def searchConversationLogs(self, arguments: Dict[str, Any]):
+        terms = arguments["terms"].split(",")
+        results = self.searchIndex(terms)
         if not results:
             yield ("result", self.context_template(self.query, "No results found in logs, do not search logs for this query."))
         else:
@@ -59,6 +64,7 @@ Answer the query using the context provided above.
 
 
     def additional_notes(self) -> str:
+        return ""
         logManager = self.config_manager.get_log_manager()
         indexes = logManager.get_all_indexes(self.persona)
         indexes_str = ",".join(indexes)
