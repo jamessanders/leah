@@ -1,0 +1,76 @@
+from datetime import datetime
+
+class LogItem:
+    def __init__(self, date_str, user_type, message):
+        self.date = datetime.strptime(date_str, '[%Y-%m-%d_%H-%M-%S]')
+        self.user_type = user_type
+        self.message = message
+
+    def __repr__(self):
+        return f"LogItem(date={self.date}, user_type={self.user_type}, message={self.message})"
+
+    @staticmethod
+    def fromLogLine(log_line: str):
+        # Extract the date, user, and message from the log line
+        date_str, user_type, message = log_line.split(' ', 2)
+        # Create and return a new LogItem instance
+        return LogItem(date_str, user_type, message.replace("\\n", "\n"))
+
+    def get_fuzzy_date(self):
+        now = datetime.now()
+        delta = now - self.date
+        if delta.days == 0:
+            return 'Today'
+        elif delta.days == 1:
+            return 'Yesterday'
+        elif delta.days < 7:
+            return f'{delta.days} days ago'
+        elif delta.days < 14:
+            return 'Last week'
+        elif delta.days < 30:
+            return f'{delta.days // 7} weeks ago'
+        elif delta.days < 365:
+            return f'{delta.days // 30} months ago'
+        else:
+            return f'{delta.days // 365} years ago'
+
+class LogCollection:
+    def __init__(self):
+        self.logs = []
+
+    def add_log(self, log_item: LogItem):
+        self.logs.append(log_item)
+        self.logs.sort(key=lambda log: log.date)
+
+    def __repr__(self):
+        return f"LogCollection({self.logs})"
+
+    @staticmethod
+    def fromLogLines(log_lines: list[str]):
+        collection = LogCollection()
+        for line in log_lines:
+            log_item = LogItem.fromLogLine(line)
+            collection.add_log(log_item)
+        return collection
+
+    def generate_report(self):
+        report = []
+        grouped_logs = {}
+        for log in self.logs:
+            fuzzy_date = log.get_fuzzy_date()
+            if fuzzy_date not in grouped_logs:
+                grouped_logs[fuzzy_date] = []
+            grouped_logs[fuzzy_date].append(log)
+
+        for fuzzy_date in sorted(grouped_logs.keys()):
+            report.append(f"Logs from {fuzzy_date}:")
+            for log in grouped_logs[fuzzy_date]:
+                time_str = log.date.strftime('%H:%M:%S')
+                if log.get_fuzzy_date() not in ['Today', 'Yesterday']:
+                    full_date_str = log.date.strftime('%B %d, %Y')
+                    report.append(f"at {time_str} on {full_date_str}, {log.user_type} said: {log.message} ")
+                else:
+                    report.append(f"at {time_str} {fuzzy_date}, {log.user_type} said: {log.message}")
+            report.append("")  # Add a newline for separation
+
+        return "\n".join(report) 

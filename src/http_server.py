@@ -26,6 +26,7 @@ from AuthManager import AuthManager
 from functools import wraps
 from actions import Actions
 from stream_processor import StreamProcessor
+from LogItem import LogItem, LogCollection
 app = Flask(__name__)
 
 # Create application context
@@ -81,29 +82,80 @@ def token_required(f):
 
 
 # Create a queue to hold the tuples
-cleanup_queue = queue.Queue()
+memory_builder_queue = queue.Queue()
 indexing_queue = queue.Queue()
 
 # Function to watch the queue and process items
-def watch_queue():
+def watch_memory_builder_queue():
     while True:
         try:
             # Wait for 2 minutes
             time.sleep(30)
             # Check if there is an item in the queue
-            if not cleanup_queue.empty():
+            if not memory_builder_queue.empty():
                 # Get the item from the queue
-                username, persona, parsed_history, full_response = cleanup_queue.get()
+                username, persona, parsed_history, full_response = memory_builder_queue.get()
                 # Process the item
-                after_request_cleanup(username, persona, parsed_history, full_response)
+                memory_builder(username, persona, parsed_history, full_response)
             if not indexing_queue.empty():
                 username, persona, parsed_history, full_response = indexing_queue.get()
-                after_request_indexing(username, persona, parsed_history, full_response)
         except Exception as e:
             print(f"Error in watch_queue: {e}")
 
 # Start the background thread
-threading.Thread(target=watch_queue, daemon=True).start()
+threading.Thread(target=watch_memory_builder_queue, daemon=True).start()
+
+def watch_indexing_queue():
+    while True:
+        time.sleep(5)
+        try:
+            username, persona, query, full_response = indexing_queue.get()
+            run_indexer(username, persona, query, full_response)
+        except Exception as e:
+            print(f"Error in watch_indexing_queue: {e}")
+            print(traceback.format_exc())
+
+threading.Thread(target=watch_indexing_queue, daemon=True).start()
+
+def memory_builder(username, persona, parsed_history, full_response):
+    print("Running memory builder")
+    config_manager = LocalConfigManager(username)
+    notesManager = config_manager.get_notes_manager()
+    memories = notesManager.get_note(f"memories/memories_{persona}.txt")
+    if not memories:
+        notesManager.put_note(f"memories/memories_{persona}.txt", "No previous notes.")
+    memories = notesManager.get_note(f"memories/memories_{persona}.txt")
+    parsed_history.append({"role": "assistant", "content": full_response})
+    parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
+    prompt = memory_template(memories)
+    persona_override = {
+        "system_content": "You are a rigorous and detailed note taker.\n\n" + prompt
+    }
+    result = ask_agent(persona, "Generate new notes based on the conversation and the previous notes.", conversation_history=parsed_history, persona_override=persona_override)
+    notesManager.put_note(f"memories/memories_{persona}.txt", result)
+ 
+def run_indexer(username, persona, query, full_response): 
+    print("Running indexer")
+    config_manager = LocalConfigManager(username)
+    convo = (query + "\n" + full_response).split(" ")
+    if len(convo) > 300:
+        convo = convo[:299]
+    convo = " ".join(convo)
+    script = f"""
+Return five index terms relevant to the conversation below. Return the only the terms as a comma seperated list.
+
+The conversation:
+
+{convo}
+""" 
+    terms = ask_agent("summer", script)
+    print("Logging terms: " + terms)
+    logger = config_manager.get_log_manager()
+    for term in terms.split(","):
+        term = term.strip()
+        logger.log_index_item(term, "[USER] " + query, persona)
+        logger.log_index_item(term, "[ASSISTANT] " + full_response, persona)
+
 
 voice_files = {}
 voice_queue = queue.Queue()
@@ -255,43 +307,7 @@ The reply should be no longer than 5000 words.
 Don't include any other text than the notes.
 """
 
-def after_request_cleanup(username, persona, parsed_history, full_response):
-    # Add any cleanup or logging logic here
-    config_manager = LocalConfigManager(username)
-    notesManager = config_manager.get_notes_manager()
-    memories = notesManager.get_note(f"memories/memories_{persona}.txt")
-    if not memories:
-        notesManager.put_note(f"memories/memories_{persona}.txt", "No previous notes.")
-    memories = notesManager.get_note(f"memories/memories_{persona}.txt")
-    parsed_history.append({"role": "assistant", "content": full_response})
-    parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
-    prompt = memory_template(memories)
-    persona_override = {
-        "system_content": "You are a rigorous and detailed note taker.\n\n" + prompt
-    }
-    result = ask_agent(persona, "Generate new notes based on the conversation and the previous notes.", conversation_history=parsed_history, persona_override=persona_override)
-    notesManager.put_note(f"memories/memories_{persona}.txt", result)
- 
-def after_request_indexing(username, persona, parsed_history, full_response):   
-    config_manager = LocalConfigManager(username)
-    query = parsed_history[-2]["content"]
-    resp = parsed_history[-1]["content"]
-    convo = (query + "\n\n" + resp).split(" ")
-    if len(convo) > 300:
-        convo = convo[:299]
-    convo = " ".join(convo)
-    script = f"""
-Return five index terms relevant to the conversation below. Return the only the terms as a comma seperated list.
 
-The conversation:
-
-{convo}
-""" 
-    terms = ask_agent("summer", script)
-    print("Logging terms: " + terms)
-    logger = LogAction.LogAction(config_manager, persona, query, parsed_history)
-    logger.logIndex({"terms": terms})
-    
     
     
 def compress_memories(memories, query):
@@ -300,10 +316,11 @@ Here is some context:
 
 {memories}
 
-Summarize the information above to include only the information relevant to answering the following query, make sure to label the subject for the information.  Respond only with the requested summary do not ask follow up questions.
+Summarize the information above to include only the information relevant to answering the following query, make sure to label the subject for the information. Also include any information about the user.  Respond only with the requested summary do not ask follow up questions.
 The query is: {query}
 """
     return ask_agent("summer", script)
+
 
 def search_past_logs(config_manager, persona, query):
     script = f"""
@@ -315,20 +332,13 @@ The query is: {query}
     terms = ask_agent("summer", script)
     print("Terms: " + terms)
     logAction = LogAction.LogAction(config_manager, persona, query, None)
-    messages = []
-    out = []
+    logs = []
     for log in logAction.searchIndex(terms.split(",")):
         if len(log) > 256:
             log = log[:255]
-        items = log.split(" ")
-        date = items[0]
-        user = items[1]
-        message = " ".join(items[2:])
-        if not message in messages:
-            out.append(log)
-        else:
-            messages.append(message)
-    return out
+            logs.append(log)
+    log_items = LogCollection.fromLogLines(logs)
+    return log_items.generate_report()
 
 @app.route('/query', methods=['POST'])
 @token_required
@@ -371,14 +381,12 @@ def query():
         pastlogs = "No past logs found"
         
         try:
-            foundlogs = search_past_logs(config_manager, persona, data.get("query",""))
-            if foundlogs:
-                pastlogs = "\n".join(foundlogs)
+            pastlogs = search_past_logs(config_manager, persona, data.get("query",""))
         except:
             pass
         
         if memories:
-            memories = "These are your memories from previous conversations: \n\n" + memories + "\n\nThese are some relevant conversation logs:\n\n" + pastlogs
+            memories = "These are your memories from previous conversations: \n\n" + memories + (pastlogs and ("\n\nThese are some relevant conversation logs:\n\n" + pastlogs) or "")
         else:
             memories = ""
 
@@ -516,27 +524,28 @@ def query():
         log_manager.log_chat("user", original_query, persona)
         log_manager.log_chat("assistant", full_response, persona)
         # Add the current request to the cleanup queue after the response is sent
-        add_to_cleanup_queue(username, persona, parsed_history, full_response)
+        update_post_request_queue(username, persona, copy.deepcopy(parsed_history), full_response)
+        indexing_queue.put((username, persona, original_query, full_response))
+
 
 
     # Method to add to the queue
-    def add_to_cleanup_queue(username, persona, parsed_history, full_response):
+    def update_post_request_queue(username, persona, parsed_history, full_response):
         # Clear all existing items from the cleanup queue
         # Remove existing items for this persona from the cleanup queue
         items = []
-        while not cleanup_queue.empty():
+        while not memory_builder_queue.empty():
             try:
-                item = cleanup_queue.get_nowait()
+                item = memory_builder_queue.get_nowait()
                 if item[0] != persona:  # Keep items for other personas
                     items.append(item)
             except queue.Empty:
                 break
         # Put back items we want to keep
         for item in items:
-            cleanup_queue.put(item)
+            memory_builder_queue.put(item)
 
-        cleanup_queue.put((username, persona, parsed_history, full_response))
-        indexing_queue.put((username, persona, copy.deepcopy(parsed_history), full_response))
+        memory_builder_queue.put((username, persona, copy.deepcopy(parsed_history), full_response))
     return app.response_class(generate_stream(), mimetype='text/event-stream')
 
 @app.route('/voice/<voice_filename>')
@@ -597,8 +606,6 @@ def login():
 @token_required
 def protected_route():
     return jsonify({"message": "This is a protected route. You have valid authentication."}), 200
-
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001) 

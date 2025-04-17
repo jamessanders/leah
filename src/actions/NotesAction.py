@@ -12,15 +12,6 @@ class NotesAction(IAction):
 
     def getTools(self):
         return [
-            (self.put_note, 
-             "put_note", 
-             "Add a note in your notes files, these can be used to answer the user's query. Note names should be in the format of 'note_name.txt'", 
-             {"note_name": "<the name of the note to add>", "note_content": "<the content of the note to add>"}),
-            (self.get_note,
-              "get_note", 
-              "Get a note from your notes, these can be used to answer the user's query. Note names should be in the format of 'note_name.txt'", 
-              {"note_name": "<the name of the note to get>"}),
-            (self.list_notes, "list_notes", "List all the notes you have, this will be used to answer the user's query", {}),
             (self.store_reminder, "store_reminder", "Store a reminder in your notes, this will be used to answer the user's query", {"reminder": "<the reminder to store>", "when": "<when the reminder is for>"}),
             (self.get_reminders, "get_reminders", "Get all the reminders you have, this will be used to answer the user's query", {}),
             (self.remove_reminder, "remove_reminder", "Remove a reminder", {"id": "<the id of the reminder to remove>"})
@@ -50,7 +41,7 @@ Answer the query using the context provided above.
         if notes is None:
             notes = ""
         notes_manager.put_note("reminders", notes + "\n" + "Reminder: " + arguments["reminder"] + ",When: " + arguments.get("when", "whenever") + ", Stored at: " + now + ", ID: " + id)
-        yield ("result", "You stored a reminder: " + arguments["reminder"] + " for " + arguments.get("when", "whenever") + ".")
+        yield ("end", "Stored a reminder: " + arguments["reminder"] + " for " + arguments.get("when", "whenever") + ".")
 
     def get_reminders(self, arguments: Dict[str, Any]):
         config_manager = self.config_manager

@@ -70,6 +70,8 @@ class Actions:
  - Do not ask the user to provide the tool name, just respond with the tool.
  - Do not use tags like <|python_start|>
  - Just use tools without telling the user that you will perform a task.
+ - Tool usage can be mixed with conversation text.
+ - Do not call the same tool with the same arguments more than once in a conversation.
 """ + "\n" + additional_notes + """
 
 ## Tools: 

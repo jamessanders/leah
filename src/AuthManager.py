@@ -19,8 +19,8 @@ class AuthManager:
         self.config_path = self.config_manager.get_path("auth.json")
         self.auth_data: Dict[str, Any] = {}
         self.load_auth_data()
-        # Token expiration time in seconds (24 hours)
-        self.token_expiration = 86400
+        # Token expiration time in seconds (1 year)
+        self.token_expiration = 86400*365
 
     def load_auth_data(self) -> None:
         """

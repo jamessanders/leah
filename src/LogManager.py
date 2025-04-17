@@ -45,7 +45,9 @@ class LogManager:
             message (str): The message to log
             persona (str): The persona name to organize logs under (default: "default")
         """
+        term = term.lower().replace(" ", "_")
         timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        message = message.replace("\n", "\\n")
         log_entry = f"[{timestamp}] {message}\n"
         
         # Create a log file for the current term in the logs/index/persona directory
@@ -60,6 +62,7 @@ class LogManager:
         """
         Search the log for an index item with a timestamp.
         """
+        term = term.lower().replace(" ", "_")
         log_file = os.path.join(self.logs_directory, "index", persona, f"{term}.log")
         if not os.path.exists(log_file):
             return []
