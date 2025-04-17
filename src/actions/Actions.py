@@ -47,7 +47,7 @@ class Actions:
                     if tool[1] == tool_method:
                         yield from tool[0](arguments)
                         return
-        yield "Tool not found"
+        yield ("end", "Tool not found") 
 
     def get_actions_prompt(self) -> str:
         

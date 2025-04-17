@@ -62,12 +62,17 @@ class LogManager:
         """
         Search the log for an index item with a timestamp.
         """
-        term = term.lower().replace(" ", "_")
+        output = []
+        term = term.strip().lower().replace(" ", "_")
         log_file = os.path.join(self.logs_directory, "index", persona, f"{term}.log")
+        print("Searching for log file: " + log_file)
         if not os.path.exists(log_file):
             return []
         with open(log_file, 'r', encoding='utf-8') as file:
-            return file.readlines()
+            print("Found log file: " + log_file)
+            for line in file:
+                output.append(line.strip())
+        return list(set(output))
 
 
     def log_chat(self, message_type: str, message: str, persona: str = "default") -> None:

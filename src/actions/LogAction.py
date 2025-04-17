@@ -11,8 +11,8 @@ class LogAction(IAction):
 
     def getTools(self) -> List[tuple]:
         return [
-            (self.searchConversationLogs, "search_conversation_logs", "Searches past conversation logs for search terms related to the query and the response. Use this tool to find information from past conversations. Provide multiple terms to search for to expand the search.", {"terms": "<comma separated list of search terms>"}),
-            (self.getPastConversations, "get_past_conversations", "Searches past conversation logs. Use this tool to find information from past conversations. It takes a single argument for the number of days to worth of conversation to gather.", {"days": "<number of days to gather>"})
+            (self.searchConversationLogs, "search_conversation_logs", "Searches past conversation logs for search terms related to the query and the response. Use this tool to find information from past conversations. Provide multiple terms to search for to expand the search. Only use this tool if you cannot answer the query based on conversation context.", {"terms": "<comma separated list of search terms>"}),
+            (self.getPastConversations, "get_past_conversations", "Searches past conversation logs. Use this tool to find information from past conversations. It takes a single argument for the number of days to worth of conversation to gather. Only use this tool if you cannot answer the query using the searchConversationLogs tool.", {"days": "<number of days to gather>"})
         ]
     
     def context_template(self, message: str, context: str) -> str:
@@ -39,9 +39,7 @@ Answer the query using the context provided above.
         yield ("end", "")
 
     def searchIndex(self, terms):
-        yield ("system", "Searching logs for " + ",".join(terms))
         logManager = self.config_manager.get_log_manager()
-        terms = terms
         results = []
         for term in terms:
             for result in logManager.search_log_item(self.persona, term):

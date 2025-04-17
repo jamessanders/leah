@@ -331,12 +331,14 @@ The query is: {query}
 """ 
     terms = ask_agent("summer", script)
     print("Terms: " + terms)
-    logAction = LogAction.LogAction(config_manager, persona, query, None)
+    logManager = config_manager.get_log_manager()
     logs = []
-    for log in logAction.searchIndex(terms.split(",")):
-        if len(log) > 256:
-            log = log[:255]
+    for term in terms.split(","):
+        for log in logManager.search_log_item(persona, term.strip()):
+            if len(log) > 256:
+                log = log[:255]
             logs.append(log)
+    print("Found " + str(len(logs)) + " logs")
     log_items = LogCollection.fromLogLines(logs)
     return log_items.generate_report()
 
@@ -380,10 +382,9 @@ def query():
         
         pastlogs = "No past logs found"
         
-        try:
-            pastlogs = search_past_logs(config_manager, persona, data.get("query",""))
-        except:
-            pass
+      
+        pastlogs = search_past_logs(config_manager, persona, data.get("query",""))
+        
         
         if memories:
             memories = "These are your memories from previous conversations: \n\n" + memories + (pastlogs and ("\n\nThese are some relevant conversation logs:\n\n" + pastlogs) or "")
