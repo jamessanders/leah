@@ -84,7 +84,7 @@ Answer the query using the context provided above.
         try:
             url = arguments['url']
             yield ("system", "Fetching url with Selenium: " + url)
-            main_content = fetch_url_with_selenium(url, driver=self.config_manager.get_web_driver())
+            main_content = fetch_url_with_selenium(url)
             yield ("result", self.context_template(self.query, main_content, url))
         except Exception as e:
             yield ("result", self.context_template(self.query, "Error fetching the url with Selenium", url))
