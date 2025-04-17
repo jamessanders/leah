@@ -73,7 +73,7 @@ Answer the query using the context provided above.
             yield ("result", self.context_template(self.query, "Error fetching weather data, try giving a more specific location", url))
             return
         url = f"https://forecast.weather.gov/MapClick.php?lat={arguments['latitude']}&lon={arguments['longitude']}"
-        yield ("system", "Fetching weather data for " + arguments['latitude'] + "," + arguments['longitude'])
+        yield ("system", "Fetching weather data for " + str(arguments['latitude']) + "," + str(arguments['longitude']))
         try:
             yield ("result", self.context_template(self.query, fetch_url_with_selenium(url, find_element=find_weather_element), url))
         except Exception as e:
@@ -84,7 +84,7 @@ Answer the query using the context provided above.
         try:
             url = arguments['url']
             yield ("system", "Fetching url with Selenium: " + url)
-            main_content = fetch_url_with_selenium(url)
+            main_content = fetch_url_with_selenium(url, driver=self.config_manager.get_web_driver())
             yield ("result", self.context_template(self.query, main_content, url))
         except Exception as e:
             yield ("result", self.context_template(self.query, "Error fetching the url with Selenium", url))

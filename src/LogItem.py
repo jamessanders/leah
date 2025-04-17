@@ -53,10 +53,14 @@ class LogCollection:
             collection.add_log(log_item)
         return collection
 
-    def generate_report(self):
+    def generate_report(self, max_logs: int = 50):
         report = []
         grouped_logs = {}
+        c = 0
         for log in self.logs:
+            if c > max_logs:
+                break
+            c += 1
             fuzzy_date = log.get_fuzzy_date()
             if fuzzy_date not in grouped_logs:
                 grouped_logs[fuzzy_date] = []

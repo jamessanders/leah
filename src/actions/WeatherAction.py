@@ -48,12 +48,12 @@ Answer the query using the context provided above.
         yield ("result", "The latitude and longitude of " + arguments['city'] + " are 37.774929 and -122.419418")
 
     def fetch_weather(self, arguments: Dict[str, Any]):
-        yield ("system", "Fetching weather data for " + arguments['latitude'] + "," + arguments['longitude'])
         # Example tool method
-        if not arguments['latitude'] or not arguments['longitude']:
+        if not arguments.get('latitude') or not arguments.get('longitude'):
             yield ("result", self.context_template(self.query, "Error fetching weather data, try giving a more specific location", url))
             return
         
+        yield ("system", "Fetching weather data for " + str(arguments['latitude']) + "," + str(arguments['longitude']))
         url = f"https://api.weather.gov/points/{arguments['latitude']},{arguments['longitude']}"
         with urllib.request.urlopen(url) as response:
             html = response.read()

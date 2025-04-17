@@ -265,6 +265,7 @@ const App = () => {
                         const jsonResponse = JSON.parse(jsonObject.replace(/^data:\s*/, ''));
                         if (jsonResponse.type === 'system' && jsonResponse.content) {
                             console.log('System message:', jsonResponse.content);
+                            setResponses(prevResponses => [...prevResponses, { role: 'system', content: `System: ${jsonResponse.content}` }]);
                         } else if (jsonResponse.type === 'end') {
                             setLoading(false); // Hide loading message
                             console.log("Finished processing submission, checking queue");
@@ -571,10 +572,10 @@ React.useEffect(() => {
                     responses.map((item, index) =>
                         React.createElement('div', {
                             key: index,
-                            className: item.role === 'user' ? 'userInputBox' : 'responseBox',
+                            className: (item.role === 'user' ? 'userInputBox' : 'responseBox') + (item.role === 'system' ? ' systemMessage' : ''),
                             style: { display: 'flex', alignItems: 'flex-start' } // Align items vertically at the start
                         },
-                        React.createElement('div', {
+                        item.role !== 'system' && React.createElement('div', {
                             className: 'avatar' // Assign class name 'avatar'
                         },
                         item.role === 'assistant' && React.createElement('img', {

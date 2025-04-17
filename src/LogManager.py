@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from datetime import timedelta
-
+from LogItem import LogCollection
 class LogManager:
     def __init__(self, config_manager):
         """
@@ -142,6 +142,6 @@ class LogManager:
             if os.path.exists(log_file):
                 with open(log_file, 'r', encoding='utf-8') as file:
                     for line in file:
-                        log_entries.append(" ".join(line.split(" ")[:200]).replace("\\n","\n"))
-
-        return log_entries 
+                        log_entries.append(" ".join(line.split(" ")[:200]))        
+        log_collection = LogCollection.fromLogLines(log_entries)
+        return log_collection.generate_report()

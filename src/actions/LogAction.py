@@ -59,7 +59,7 @@ Answer the query using the context provided above.
         logManager = self.config_manager.get_log_manager()
         days = int(arguments["days"])
         results = logManager.get_logs_for_days(self.persona, days)
-        yield ("result", self.context_template(self.query, "\n".join(results)))
+        yield ("result", self.context_template(self.query, results))
 
 
     def additional_notes(self) -> str:

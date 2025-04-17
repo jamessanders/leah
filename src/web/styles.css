@@ -487,4 +487,16 @@ a:hover {
 
 .logout-button:hover {
     background-color: #c82333;
+}
+
+
+.responseBox.systemMessage {
+    background: green;
+    font-style: italic;
+    color: white;
+  font-size: 10px;
+  padding:5px;
+  border-radius:5px;
+  animation: userMessageFade 0.5s ease-out forwards;
+
 } 

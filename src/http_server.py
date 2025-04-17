@@ -485,6 +485,7 @@ def query():
                         parsed_history.append({"role": "assistant", "content": full_response})
                         tool_name = parsed_response.get("action", "")
                         print("Tool name: " + tool_name)
+                        yield system_message("Launching tool: " + tool_name)
                         tool_arguments = parsed_response.get("arguments", "{}")
                         if isinstance(tool_arguments, str):
                             tool_arguments = json.loads(tool_arguments)
@@ -505,7 +506,7 @@ def query():
                                     parsed_history.pop()
                                 parsed_history.append({"role": "user", "content": message})
                                 data['query'] = message
-                                yield system_message("Query rewritten: " + message)
+                                yield system_message("Context added to query")
                 except Exception as e:
                     import traceback
                     error_message = f"An error occurred: {str(e)}\n"

@@ -3,6 +3,9 @@ from pathlib import Path
 from NotesManager import NotesManager
 from LogManager import LogManager
 from config import Config
+from webdriver_singleton import WebDriverSingleton  
+from selenium.webdriver.remote.webdriver import WebDriver
+
 class LocalConfigManager:
     def __init__(self, user_id: str):
         """
@@ -77,3 +80,12 @@ class LocalConfigManager:
             Config: A Config instance configured for this user
         """
         return Config()
+    
+    def get_web_driver(self) -> WebDriver:
+        """
+        Get a WebDriver instance for managing web drivers.
+        
+        Returns:
+            WebDriver: A WebDriver instance configured for this user
+        """
+        return WebDriverSingleton().get_driver()

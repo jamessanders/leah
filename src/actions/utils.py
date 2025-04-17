@@ -11,6 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 import requests 
+from selenium.webdriver.remote.webdriver import WebDriver
 
 def extract_main_content(html: bytes, base_url: str) -> str:
     """Extract the main content as markdown from HTML content, using lxml.html.clean."""
@@ -37,15 +38,17 @@ def extract_main_content(html: bytes, base_url: str) -> str:
     
     return markdown_content
 
-def fetch_url_with_selenium(url: str, find_element: Callable = None):
-    # Set up Selenium WebDriver with Chrome
-    chrome_options = Options()
-    chrome_options.add_argument('--headless')  # Run headless Chrome
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    
-    # Initialize the WebDriver
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+def fetch_url_with_selenium(url: str, find_element: Callable = None, user_driver: WebDriver = None):
+    if not user_driver:
+        # Set up Selenium WebDriver with Chrome
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')  # Run headless Chrome
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        # Initialize the WebDriver
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    else:
+        driver = user_driver
     
     # Fetch the URL
     driver.get(url)
@@ -72,7 +75,8 @@ def fetch_url_with_selenium(url: str, find_element: Callable = None):
     html = main_content_element.get_attribute('innerHTML')
     
     # Close the WebDriver
-    driver.quit()
+    if not user_driver:
+        driver.quit()
     
     # Extract main content
     main_content = extract_main_content(html.encode('utf-8'), url)
