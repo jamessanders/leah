@@ -31,8 +31,6 @@ class Actions:
         
         self.actions = [
             LinkAction.LinkAction(config_manager, persona, query, conversation_history),
-            WeatherAction.WeatherAction(config_manager, persona, query, conversation_history),
-            TimeAction.TimeAction(config_manager, persona, query, conversation_history),
             NotesAction.NotesAction(config_manager, persona, query, conversation_history),
             LogAction.LogAction(config_manager, persona, query, conversation_history),
             ImageGen.ImageGen(config_manager, persona, query, conversation_history)

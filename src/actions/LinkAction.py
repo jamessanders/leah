@@ -1,16 +1,9 @@
 from datetime import datetime
 from typing import List, Dict, Any, Callable
 from .IActions import IAction
-import lxml.html
-from lxml.html.clean import Cleaner
-import html2text
-import re
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
+from .utils import fetch_url_with_selenium
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-import requests
+
 
 class LinkAction(IAction):
     def __init__(self, config_manager, persona: str, query: str, conversation_history: List[Dict[str, Any]]):
@@ -26,8 +19,8 @@ class LinkAction(IAction):
             "success": True
         }
 
-    def addition_notes(self) -> str:
-        return " - You can fetch any URL from the internet.  Always use the fetch_link tool to fetch the contents of a URL."
+    def additional_notes(self) -> str:
+        return " - You can fetch any URL from the internet.  Always use the fetch_link tool to fetch the contents of a URL.  Always use fetch_weather_info to get the latest weather and fetch_stock_info to get the latest info on a stock symbol."
 
     def getTools(self) -> List[tuple]:
         # Return a list of callable tools and their descriptions
@@ -39,7 +32,11 @@ class LinkAction(IAction):
             (self.fetch_stock_info, 
              "fetch_stock_info",
              "Downloads the contents of a stock info url.  Used to fetch stock info of stock symbol", 
-             {"symbol": "<the symbol of the stock to fetch>"})
+             {"symbol": "<the symbol of the stock to fetch>"}),
+            (self.fetch_weather_info, 
+             "fetch_weather_info",
+             "Fetches weather information based for a specific city using latitude and longitude, first fetch the latitude and longitude of the city", 
+             {"latitude": "<the latitude of the weather to fetch>", "longitude": "<the longitude of the weather to fetch>"})
         ]
     def context_template(self, message: str, context: str, extracted_url: str) -> str:
         now = datetime.now()
@@ -55,91 +52,39 @@ Here is the query:
 
 Answer the query using the context provided above.
 """
-
-    def extract_main_content(self, html: bytes, base_url: str) -> str:
-        """Extract the main content as markdown from HTML content, using lxml.html.clean."""
-        # Parse the HTML content
-        document = lxml.html.fromstring(html)
-        
-        # Use lxml's Cleaner to clean the document
-        cleaner = Cleaner()
-        cleaner.javascript = True  # Remove JavaScript
-        cleaner.style = True       # Remove styles
-        cleaner.links = False       # Remove links
-        cleaned_content = cleaner.clean_html(document)
-        
-        # Convert cleaned content to string
-        main_content = lxml.html.tostring(cleaned_content, encoding='unicode')
-                
-        # Limit the number of tokens to 1024
-        tokens = main_content.split()
-        print("Tokens: ", len(tokens))
-        limited_content = ' '.join(tokens[:15000])
-        
-        # Convert limited content to markdown
-        markdown_content = html2text.html2text(limited_content)
-        
-        return markdown_content
-
-    def fetch_link(self, arguments: Dict[str, Any]):
-        try:
-            url = arguments['url']
-            response = requests.get(url)
-            status_code = response.status_code
-            html = response.content
-            if status_code != 200:
-                yield ("result", self.context_template(self.query, "Error fetching the url", url))
-            else:
-                yield ("result", self.context_template(self.query, self.extract_main_content(html, url), url))
-        except Exception as e:
-            yield ("result", self.context_template(self.query, "Error fetching the url", url))
-
     def fetch_stock_info(self, arguments: Dict[str, Any]):
         try:
             symbol = arguments['symbol']
+            yield ("system", "Fetching stock info for " + symbol)
             yield from self.fetch_link_with_selenium({"url": f"https://finance.yahoo.com/quote/{symbol}"})
         except Exception as e:
             yield ("result", self.context_template(self.query, "Error fetching the stock info", symbol))
             
+    def fetch_weather_info(self, arguments: Dict[str, Any]):
+        def find_weather_element(driver):
+            try:
+                current_conditions_body = driver.find_element(By.ID, 'current-conditions')
+                seven_day_forecast = driver.find_element(By.ID, 'seven-day-forecast')
+                return [current_conditions_body, seven_day_forecast]
+            except:
+                return None
 
+        if not arguments['latitude'] or not arguments['longitude']:
+            yield ("result", self.context_template(self.query, "Error fetching weather data, try giving a more specific location", url))
+            return
+        url = f"https://forecast.weather.gov/MapClick.php?lat={arguments['latitude']}&lon={arguments['longitude']}"
+        yield ("system", "Fetching weather data for " + arguments['latitude'] + "," + arguments['longitude'])
+        try:
+            yield ("result", self.context_template(self.query, fetch_url_with_selenium(url, find_element=find_weather_element), url))
+        except Exception as e:
+            yield ("result", self.context_template(self.query, "Error fetching the weather info", url))
+        
+        
     def fetch_link_with_selenium(self, arguments: Dict[str, Any]):
         try:
             url = arguments['url']
-            
-            # Set up Selenium WebDriver with Chrome
-            chrome_options = Options()
-            chrome_options.add_argument('--headless')  # Run headless Chrome
-            chrome_options.add_argument('--no-sandbox')
-            chrome_options.add_argument('--disable-dev-shm-usage')
-            
-            # Initialize the WebDriver
-            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-            
-            # Fetch the URL
-            driver.get(url)
-            
-            # Attempt to find the main content section
-            main_content_element = None
-            try:
-                main_content_element = driver.find_element(By.TAG_NAME, 'main')
-            except:
-                try:
-                    main_content_element = driver.find_element(By.TAG_NAME, 'article')
-                except:
-                    try:
-                        main_content_element = driver.find_element(By.CLASS_NAME, 'content')
-                    except:
-                        main_content_element = driver.find_element(By.TAG_NAME, 'body')
-            
-            # Extract the page source from the main content
-            html = main_content_element.get_attribute('innerHTML')
-            
-            # Close the WebDriver
-            driver.quit()
-            
-            # Extract main content
-            main_content = self.extract_main_content(html.encode('utf-8'), url)
-            
+            yield ("system", "Fetching url with Selenium: " + url)
+            main_content = fetch_url_with_selenium(url)
             yield ("result", self.context_template(self.query, main_content, url))
         except Exception as e:
             yield ("result", self.context_template(self.query, "Error fetching the url with Selenium", url))

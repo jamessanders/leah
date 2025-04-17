@@ -37,7 +37,7 @@ Answer the query using the context provided above.
         for term in terms:
             logManager.log_index_item(term, "[USER] " + self.query.replace("\n", "\\n"), self.persona)
             logManager.log_index_item(term, "[ASSISTANT] " + self.conversation_history[-1]["content"].replace("\n", "\\n"), self.persona)
-        yield ("end", "Index terms logged")
+        yield ("end", "")
 
     def searchConversationLogs(self, arguments: Dict[str, Any]):
         logManager = self.config_manager.get_log_manager()

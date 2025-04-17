@@ -29,7 +29,7 @@ class IAction(ABC):
         """
         pass 
 
-    def addition_notes(self) -> str:
+    def additional_notes(self) -> str:
         """
         Returns a string of additional notes for the action.
         """

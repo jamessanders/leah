@@ -50,7 +50,7 @@ Answer the query using the context provided above.
         if notes is None:
             notes = ""
         notes_manager.put_note("reminders", notes + "\n" + "Reminder: " + arguments["reminder"] + ",When: " + arguments.get("when", "whenever") + ", Stored at: " + now + ", ID: " + id)
-        yield ("end", "Reminder stored")
+        yield ("result", "You stored a reminder: " + arguments["reminder"] + " for " + arguments.get("when", "whenever") + ".")
 
     def get_reminders(self, arguments: Dict[str, Any]):
         config_manager = self.config_manager
