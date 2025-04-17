@@ -263,9 +263,19 @@ const App = () => {
                     try {
                         // Strip the 'data:' prefix and parse the JSON response
                         const jsonResponse = JSON.parse(jsonObject.replace(/^data:\s*/, ''));
+                        console.log("JSON response:", jsonResponse);
                         if (jsonResponse.type === 'system' && jsonResponse.content) {
                             console.log('System message:', jsonResponse.content);
-                            setResponses(prevResponses => [...prevResponses, { role: 'system', content: `System: ${jsonResponse.content}` }]);
+                            setResponses(prevResponses => {
+                                const lastResponse = prevResponses[prevResponses.length - 1];
+                                if (lastResponse.role === 'assistant') {
+                                    // Insert system message before the last assistant response
+                                    return [...prevResponses.slice(0, -1), { role: 'system', content: `System: ${jsonResponse.content}` }, lastResponse];
+                                } else {
+                                    // Add system message normally
+                                    return [...prevResponses, { role: 'system', content: `${jsonResponse.content}` }];
+                                }
+                            });
                         } else if (jsonResponse.type === 'end') {
                             setLoading(false); // Hide loading message
                             console.log("Finished processing submission, checking queue");
@@ -286,7 +296,8 @@ const App = () => {
                                     return [...prevResponses, { role: 'assistant', content: plainTextContent }];
                                 }
                             });
-                        } else if (jsonResponse.voice_type && jsonResponse.filename && !isMuted) {
+                        } else if (jsonResponse.filename && !isMuted) {
+                            console.log("Adding voice to queue:", jsonResponse.filename);
                             addToAudioQueue("/voice/" + jsonResponse.filename); // Add to the audio queue only if not muted
                         } else if (jsonResponse.type === "history" && jsonResponse.history) {
                             // Update the conversation history with the server's version

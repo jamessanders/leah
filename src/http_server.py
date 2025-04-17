@@ -382,16 +382,15 @@ def query():
         
         pastlogs = "No past logs found"
         
-      
-        pastlogs = search_past_logs(config_manager, persona, data.get("query",""))
-        
+        try:
+            pastlogs = search_past_logs(config_manager, persona, data.get("query",""))
+        except:
+            pass
         
         if memories:
             memories = "These are your memories from previous conversations: \n\n" + memories + (pastlogs and ("\n\nThese are some relevant conversation logs:\n\n" + pastlogs) or "")
         else:
             memories = ""
-
-        print("Memories: " + memories)
 
         max_calls = 3
         call_count = 0
@@ -504,6 +503,7 @@ def query():
                                 parsed_history = parsed_history[:-1]
                                 if len(parsed_history) > 0:
                                     parsed_history.pop()
+                                message = f"You already used the tool {tool_name} with the following arguments: {tool_arguments} do not repeat this call.\n\n{message}"
                                 parsed_history.append({"role": "user", "content": message})
                                 data['query'] = message
                                 yield system_message("Context added to query")
