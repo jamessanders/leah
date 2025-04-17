@@ -11,7 +11,6 @@ class LogAction(IAction):
 
     def getTools(self) -> List[tuple]:
         return [
-            (self.logIndex, "log_index", "Logs a list of index terms related to the query and the response.", {"terms": "<comma separated list of index terms>"}),
             (self.searchConversationLogs, "search_conversation_logs", "Searches past conversation logs for search terms related to the query and the response. Use this tool to find information from past conversations. Provide multiple terms to search for to expand the search.", {"terms": "<comma separated list of search terms>"}),
             (self.getPastConversations, "get_past_conversations", "Searches past conversation logs. Use this tool to find information from past conversations. It takes a single argument for the number of days to worth of conversation to gather.", {"days": "<number of days to gather>"})
         ]

@@ -12,8 +12,8 @@ class NotesAction(IAction):
 
     def getTools(self):
         return [
-            (self.store_reminder, "store_reminder", "Store a reminder in your notes, this will be used to answer the user's query", {"reminder": "<the reminder to store>", "when": "<when the reminder is for>"}),
-            (self.get_reminders, "get_reminders", "Get all the reminders you have, this will be used to answer the user's query", {}),
+            (self.store_reminder, "store_reminder", "Store a reminder in your notes, this will be used to keep track of the users reminders", {"reminder": "<the reminder to store>", "when": "<when the reminder is for>"}),
+            (self.get_reminders, "get_reminders", "Get all the reminders you have, this will be used to answer the user's queries about their reminders", {}),
             (self.remove_reminder, "remove_reminder", "Remove a reminder", {"id": "<the id of the reminder to remove>"})
         ]
 
