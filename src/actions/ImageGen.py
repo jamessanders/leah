@@ -44,6 +44,7 @@ Inform the user that image generation is unavailable at this time.
 """
 
     def generate_image(self, arguments: Dict[str, Any]) -> str:
+        yield ("system", "Generating image...")
         if self.mode == "openai":
             yield from self.generate_image_with_openai(arguments)
         elif self.mode == "stable_diffusion":

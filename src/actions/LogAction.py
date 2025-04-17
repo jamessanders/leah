@@ -39,6 +39,7 @@ Answer the query using the context provided above.
         yield ("end", "")
 
     def searchIndex(self, terms):
+        yield ("system", "Searching logs for " + ",".join(terms))
         logManager = self.config_manager.get_log_manager()
         terms = terms
         results = []
@@ -48,6 +49,7 @@ Answer the query using the context provided above.
         return results
 
     def searchConversationLogs(self, arguments: Dict[str, Any]):
+        yield ("system", "Searching logs for " + arguments["terms"])
         terms = arguments["terms"].split(",")
         results = self.searchIndex(terms)
         if not results:
@@ -56,6 +58,7 @@ Answer the query using the context provided above.
             yield ("result", self.context_template(self.query, "\n".join(results)))
 
     def getPastConversations(self, arguments: Dict[str, Any]):
+        yield ("system", "Getting logs for the past " + arguments["days"] + " days")
         logManager = self.config_manager.get_log_manager()
         days = int(arguments["days"])
         results = logManager.get_logs_for_days(self.persona, days)

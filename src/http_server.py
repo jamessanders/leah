@@ -485,7 +485,6 @@ def query():
                         parsed_history.append({"role": "assistant", "content": full_response})
                         tool_name = parsed_response.get("action", "")
                         print("Tool name: " + tool_name)
-                        yield system_message("Launching tool: " + tool_name)
                         tool_arguments = parsed_response.get("arguments", "{}")
                         if isinstance(tool_arguments, str):
                             tool_arguments = json.loads(tool_arguments)

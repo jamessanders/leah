@@ -73,7 +73,7 @@ Answer the query using the context provided above.
             yield ("result", self.context_template(self.query, "Error fetching weather data, try giving a more specific location", url))
             return
         url = f"https://forecast.weather.gov/MapClick.php?lat={arguments['latitude']}&lon={arguments['longitude']}"
-        yield ("system", "Fetching weather data for " + str(arguments['latitude']) + "," + str(arguments['longitude']))
+        yield ("system", "Fetching weather forecast")
         try:
             yield ("result", self.context_template(self.query, fetch_url_with_selenium(url, find_element=find_weather_element), url))
         except Exception as e:
@@ -83,7 +83,7 @@ Answer the query using the context provided above.
     def fetch_link_with_selenium(self, arguments: Dict[str, Any]):
         try:
             url = arguments['url']
-            yield ("system", "Fetching url with Selenium: " + url)
+            yield ("system", "Reading contents of url: " + url)
             main_content = fetch_url_with_selenium(url)
             yield ("result", self.context_template(self.query, main_content, url))
         except Exception as e:

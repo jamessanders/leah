@@ -53,7 +53,7 @@ Answer the query using the context provided above.
             yield ("result", self.context_template(self.query, "Error fetching weather data, try giving a more specific location", url))
             return
         
-        yield ("system", "Fetching weather data for " + str(arguments['latitude']) + "," + str(arguments['longitude']))
+        yield ("system", "Fetching weather forecast")
         url = f"https://api.weather.gov/points/{arguments['latitude']},{arguments['longitude']}"
         with urllib.request.urlopen(url) as response:
             html = response.read()

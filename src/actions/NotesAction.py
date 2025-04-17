@@ -33,6 +33,7 @@ Answer the query using the context provided above.
 """
     
     def store_reminder(self, arguments: Dict[str, Any]):
+        yield ("system", "Storing reminder: " + arguments["reminder"] + " for " + arguments.get("when", "whenever"))
         id = str(uuid.uuid4())
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         config_manager = self.config_manager
@@ -44,6 +45,7 @@ Answer the query using the context provided above.
         yield ("end", "Stored a reminder: " + arguments["reminder"] + " for " + arguments.get("when", "whenever") + ".")
 
     def get_reminders(self, arguments: Dict[str, Any]):
+        yield ("system", "Getting reminders")
         config_manager = self.config_manager
         notes_manager = config_manager.get_notes_manager()
         notes = notes_manager.get_note("reminders")
@@ -52,6 +54,7 @@ Answer the query using the context provided above.
         yield ("result", self.context_template(self.query, notes, "reminders"))
 
     def remove_reminder(self, arguments: Dict[str, Any]):
+        yield ("system", "Removing reminder")
         id = arguments["id"]
         config_manager = self.config_manager
         notes_manager = config_manager.get_notes_manager()
@@ -69,17 +72,20 @@ Answer the query using the context provided above.
         else:
             yield ("end", "Reminder not found")
 
-    def put_note(self, arguments):
+    def put_note(self, arguments): 
+        yield ("system", "Putting note: " + arguments["note_name"])
         config_manager = self.config_manager
         notes_manager = config_manager.get_notes_manager()
         yield ("result", self.context_template(self.query, notes_manager.get_note(arguments["note_name"]), arguments["note_name"]))
 
     def get_note(self, arguments):
+        yield ("system", "Getting note: " + arguments["note_name"])
         config_manager = self.config_manager
         notes_manager = config_manager.get_notes_manager()
         yield ("result", self.context_template(self.query, notes_manager.get_note(arguments["note_name"]), arguments["note_name"]))
 
     def list_notes(self, arguments):
+        yield ("system", "Listing notes")
         config_manager = self.config_manager
         notes_manager = config_manager.get_notes_manager()
         yield ("result", "Here are all the notes you have: " + str(", ".join(notes_manager.get_all_notes())) + " answer the query based on this information, the query is: " + self.query)
