@@ -150,3 +150,31 @@ class LogManager:
                         log_entries.append(" ".join(line.split(" ")[:200]))        
         log_collection = LogCollection.fromLogLines(log_entries)
         return log_collection.generate_report()
+
+    def get_largest_index_logs(self, persona: str, num_logs: int = 100) -> list[str]:
+        """
+        Get the largest index logs sorted from largest to smallest.
+
+        Args:
+            persona (str): The persona name to filter logs.
+            num_logs (int): The number of log files to return (default: 100).
+
+        Returns:
+            list[str]: A list of the largest log file names without extensions, sorted by size.
+        """
+        index_dir = os.path.join(self.logs_directory, "index", persona)
+        if not os.path.exists(index_dir):
+            return []
+
+        log_files = []
+        for root, _, files in os.walk(index_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                file_size = os.path.getsize(file_path)
+                log_files.append((file, file_size))
+
+        # Sort log files by size in descending order
+        log_files.sort(key=lambda x: x[1], reverse=True)
+
+        # Return the largest log file names without extensions, up to num_logs
+        return [os.path.splitext(file)[0] for file, _ in log_files[:min(num_logs, len(log_files))]]

@@ -64,13 +64,12 @@ Answer the query using the context provided above.
 
 
     def additional_notes(self) -> str:
-        return ""
         logManager = self.config_manager.get_log_manager()
-        indexes = logManager.get_all_indexes(self.persona)
+        indexes = logManager.get_largest_index_logs(self.persona, 50)
         indexes_str = ",".join(indexes)
-        out = f"""Follow the response to every query with a tool that logs a list of index terms related to the query and the response. Use the LogAction.log_index tool to log a list of index terms. Do not tell the user that you are logging index terms, just do it. Do this for every response! Always search past conversation logs if you cannot answer the query. The indexes are: {indexes_str}"""
+        out = f"""Always search past conversation logs if you cannot answer the query. The indexes are: {indexes_str}"""
         if indexes:
-            out += "these are some indexes that you can use but you are not required to use them: " + indexes_str
+            out += "These are some of the most common search terms that you can use but you are not required to use them: " + indexes_str
         return out
 
     
