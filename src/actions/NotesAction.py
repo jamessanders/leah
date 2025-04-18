@@ -136,3 +136,11 @@ Answer the query using the context provided above.
         config_manager = self.config_manager
         notes_manager = config_manager.get_notes_manager()
         yield ("result", "Here are all the notes you have: " + str(", ".join(notes_manager.get_all_notes())) + " answer the query based on this information, the query is: " + self.query)
+
+    def additional_notes(self):
+        config_manager = self.config_manager
+        notes_manager = config_manager.get_notes_manager()
+        all_notes = notes_manager.get_notes_by_size(100)
+        if all_notes:
+            return "Here are some current notes you have but you can also create new ones: " + str(", ".join(all_notes))
+        return ""

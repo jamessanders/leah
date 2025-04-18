@@ -53,6 +53,8 @@ class NotesManager:
         """Retrieve the names of all note files."""
         return [note_name for note_name in os.listdir(self.notes_directory) if note_name.endswith(".txt")]
 
+    
+
     def get_all_notes_content(self) -> str:
         """Retrieve the content of all note files and output them as a single string."""
         all_content = []
@@ -64,4 +66,18 @@ class NotesManager:
                 with open(note_path, 'r', encoding='utf-8') as file:
                     print("Note: ", note_name)
                     all_content.append(note_name + ":\n" + file.read())
-        return "\n".join(all_content) 
+        return "\n".join(all_content)
+
+    def get_notes_by_size(self, max_notes: int = None) -> list[str]:
+        """Retrieve the filenames of all note files ordered by size from largest to smallest, with extensions.
+        Optionally limit the number of notes returned."""
+        notes_with_size = []
+        for note_name in os.listdir(self.notes_directory):
+            note_path = os.path.join(self.notes_directory, note_name)
+            if note_name.endswith(".txt") and os.path.isfile(note_path):
+                notes_with_size.append((note_name, os.path.getsize(note_path)))
+        # Sort notes by size in descending order
+        notes_with_size.sort(key=lambda x: x[1], reverse=True)
+        # Return filenames with extensions, limited by max_notes if provided
+        return [note[0] for note in notes_with_size[:max_notes]] 
+    

@@ -426,6 +426,7 @@ def query():
                 actions_prompt = actions.get_actions_prompt()
                 system_content = system_content + "\n\n" + actions_prompt
             
+            print("System content: " + system_content)
             response = ask_agent(persona, 
                                 data.get('query', ''), 
                                 stream=True, 
@@ -486,12 +487,12 @@ def query():
                 voice_file_info = {"filename": voice_filename}
                 yield f"data: {json.dumps(voice_file_info)}\n\n"
 
+            parsed_history.append({"role": "assistant", "content": full_response})
             tool_matches = tool_stream_processor.matches + json_stream_processor.matches
             if tool_matches:
                 try:
                     for tool in tool_matches:
                         parsed_response = json.loads(tool.strip())
-                        parsed_history.append({"role": "assistant", "content": full_response})
                         tool_name = parsed_response.get("action", "")
                         print("Tool name: " + tool_name)
                         tool_arguments = parsed_response.get("arguments", "{}")
