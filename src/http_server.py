@@ -496,6 +496,14 @@ def query():
                         for type,message in actions.run_tool(tool_name, tool_arguments):
                             if type == "system":
                                 yield f"data: {json.dumps({'type': 'system', 'content': message})}\n\n"
+                            elif type == "feedback":
+                                query, callback = message
+                                response = ask_agent(persona, 
+                                    query, 
+                                    stream=False, 
+                                    conversation_history=parsed_history, 
+                                    persona_override={"system_content":system_content})
+                                yield f"data: {json.dumps({'content': callback(response)})}\n\n"
                             elif type == "end":
                                 yield f"data: {json.dumps({'content': message})}\n\n"
                                 loop_on = False
