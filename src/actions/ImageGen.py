@@ -14,7 +14,7 @@ class ImageGen(IAction):
         self.config_manager = config_manager
         self.persona = persona
         self.query = query
-        self.mode = self.modes[0]
+        self.mode = self.modes[1]
         self.conversation_history = conversation_history
         if self.mode == self.modes[1]:
             self.stable_diffusion_config = config_manager.get_config().get_stable_diffusion_config()
@@ -44,7 +44,8 @@ Inform the user that image generation is unavailable at this time.
 """
 
     def generate_image(self, arguments: Dict[str, Any]) -> str:
-        yield ("system", "Generating image...")
+        prompt = arguments.get("prompt","")
+        yield ("system", f"Generating image of {prompt}...")
         if self.mode == "openai":
             yield from self.generate_image_with_openai(arguments)
         elif self.mode == "stable_diffusion":

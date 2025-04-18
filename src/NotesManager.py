@@ -46,7 +46,6 @@ class NotesManager:
             backup_path = os.path.join(self.backup_directory, backup_name)
             with open(note_path, 'r', encoding='utf-8') as src, open(backup_path, 'w', encoding='utf-8') as dst:
                 dst.write(src.read())
-        note_path = os.path.join(self.notes_directory, note_name)
         with open(note_path, 'w', encoding='utf-8') as file:
             file.write(content)
 

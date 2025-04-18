@@ -78,9 +78,6 @@ def token_required(f):
     
     return decorated
 
-
-
-
 # Create a queue to hold the tuples
 memory_builder_queue = queue.Queue()
 indexing_queue = queue.Queue()
@@ -128,8 +125,9 @@ def memory_builder(username, persona, parsed_history, full_response):
     parsed_history.append({"role": "assistant", "content": full_response})
     parsed_history = [msg for msg in parsed_history if msg.get('role') != 'system']
     prompt = memory_template(memories)
+    sys_content = config_manager.get_config().get_system_content(persona)
     persona_override = {
-        "system_content": "You are a rigorous and detailed note taker.\n\n" + prompt
+        "system_content": sys_content + "\n" + f"You are {persona}. You are a rigorous and detailed note taker.\n\n" + prompt
     }
     result = ask_agent(persona, "Generate new notes based on the conversation and the previous notes.", conversation_history=parsed_history, persona_override=persona_override)
     notesManager.put_note(f"memories/memories_{persona}.txt", result)
@@ -300,15 +298,13 @@ Create detailed notes about the conversation and combine them with the previous 
 Make sure to keep a profile of the user and their interests.
 Make sure to keep a profile of your own knowledge, particularily any information about the user.
 Make sure to keep a profile of your self and you relationship with the user.
+These notes are written from your own perspective and about the user.
 Remove duplicate information.
 The final should be a list of instructions for you to follow.
 Use a format that is easy for you to use for reference later.
 The reply should be no longer than 5000 words.
 Don't include any other text than the notes.
 """
-
-
-    
     
 def compress_memories(memories, query):
     script = f"""
@@ -322,9 +318,16 @@ The query is: {query}
     return ask_agent("summer", script)
 
 
-def search_past_logs(config_manager, persona, query):
+def search_past_logs(config_manager, persona, query, previous_reply=None):
+    if previous_reply:
+        previous_reply = f"Previous Reply: {previous_reply}"
+    else:
+        previous_reply = ""
     script = f"""
 Return five index terms that can be used to search past conversations relevant to the following query, return the terms as a simple commas seperated list, return only the terms and nothing else
+
+{previous_reply}
+
 
 The query is: {query}
 
@@ -383,7 +386,10 @@ def query():
         pastlogs = "No past logs found"
         
         try:
-            pastlogs = search_past_logs(config_manager, persona, data.get("query",""))
+            if len(parsed_history) >= 2:
+                pastlogs = search_past_logs(config_manager, persona, data.get("query",""), parsed_history[-1]["content"])
+            else:
+                pastlogs = search_past_logs(config_manager, persona, data.get("query",""))
         except:
             pass
         
@@ -391,6 +397,9 @@ def query():
             memories = "These are your memories from previous conversations: \n\n" + memories + (pastlogs and ("\n\nThese are some relevant conversation logs:\n\n" + pastlogs) or "")
         else:
             memories = ""
+
+        # yield system_message("Seeded memory: " + memories)
+        # yield system_message("Remember Convo: " + pastlogs)
 
         max_calls = 3
         call_count = 0
@@ -498,12 +507,14 @@ def query():
                                 yield f"data: {json.dumps({'type': 'system', 'content': message})}\n\n"
                             elif type == "feedback":
                                 query, callback = message
+                                print("FEED BACK: " + query)
                                 response = ask_agent(persona, 
                                     query, 
                                     stream=False, 
-                                    conversation_history=parsed_history, 
-                                    persona_override={"system_content":system_content})
+                                    conversation_history=parsed_history[:-1], 
+                                    persona_override={"system_content":""})
                                 yield f"data: {json.dumps({'content': callback(response)})}\n\n"
+                                loop_on = False
                             elif type == "end":
                                 yield f"data: {json.dumps({'content': message})}\n\n"
                                 loop_on = False
@@ -525,7 +536,7 @@ def query():
             else:
                 break
 
-        if call_count >= max_calls:
+        if call_count >= max_calls or not parsed_history[-1]["content"]:
             yield f"data: {json.dumps({'content': '...'})}\n\n"  
         yield f"data: {json.dumps({'type': 'end', 'content': 'END OF RESPONSE'})}\n\n"
 
